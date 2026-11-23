@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#2b2d30" />
+  <title>SECOND SELF</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect x=%272%27 y=%272%27 width=%2218%27 height=%2218%27 fill=%27none%27 stroke=%27%23e9edf2%27 stroke-width=%273%27/%3E%3Crect x=%2212%27 y=%2212%27 width=%2218%27 height=%2218%27 fill=%27none%27 stroke=%27%233d8bff%27 stroke-width=%273%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- In-game HUD: deliberately minimal -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"></div>
+    <div id="prompt"></div>
+    <div id="hint"></div>
+    <div id="levelTag"></div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="fade"></div>
+
+  <!-- Menus -->
+  <div id="ui">
+    <section id="screen-main" class="screen">
+      <div class="panel">
+        <h1 class="logo">SECOND<span>SELF</span></h1>
+        <p class="sub">A test facility. A copy of you. A way out.</p>
+        <button data-action="play" class="primary">Play</button>
+        <button data-action="levels">Level Select</button>
+        <button data-action="settings">Settings</button>
+        <button data-action="enter-vr" id="btn-vr" class="vr">Enter VR</button>
+        <p class="note" id="vr-note"></p>
+        <p class="keys">WASD move &middot; Mouse look &middot; E interact &middot; LMB grab &middot; F clone &middot; R reset clone &middot; Space jump &middot; Esc pause</p>
+      </div>
+    </section>
+
+    <section id="screen-levels" class="screen hidden">
+      <div class="panel wide">
+        <h2>Level Select</h2>
+        <div id="level-grid"></div>
+        <button data-action="back">Back</button>
+      </div>
+    </section>
+
+    <section id="screen-settings" class="screen hidden">
+      <div class="panel wide">
+        <h2>Settings</h2>
+        <div id="settings-form"></div>
+        <h3>Controls</h3>
+        <p class="note">Click a key, then press the new key. Mouse buttons are fixed.</p>
+        <div id="bindings"></div>
+        <button data-action="reset-bindings">Reset Controls</button>
+        <button data-action="back">Back</button>
+      </div>
+    </section>
+
+    <section id="screen-pause" class="screen hidden">
+      <div class="panel">
+        <h2>Paused</h2>
+        <button data-action="resume" class="primary">Resume</button>
+        <button data-action="restart">Restart Level</button>
+        <button data-action="remove-clone">Remove Clone</button>
+        <button data-action="levels">Level Select</button>
+        <button data-action="settings">Settings</button>
+        <button data-action="main">Main Menu</button>
+      </div>
+    </section>
+
+    <section id="screen-complete" class="screen hidden">
+      <div class="panel">
+        <h2 id="complete-title">Chamber Complete</h2>
+        <p id="complete-stats" class="sub"></p>
+        <button data-action="next" class="primary" id="btn-next">Next Level</button>
+        <button data-action="restart">Replay</button>
+        <button data-action="main">Main Menu</button>
+      </div>
+    </section>
+
+    <section id="screen-final" class="screen hidden">
+      <div class="panel">
+        <h2>Experiment Complete</h2>
+        <p class="sub">Subject and copy have been released. Thank you for participating.</p>
+        <p id="final-stats" class="sub"></p>
+        <button data-action="main" class="primary">Main Menu</button>
+        <button data-action="levels">Level Select</button>
+      </div>
+    </section>
+
+    <section id="screen-click" class="screen hidden">
+      <div class="panel small">
+        <p>Click to continue</p>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
