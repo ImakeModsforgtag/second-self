@@ -1,7 +1,7 @@
 // Builds and updates the 3D scene for one loaded level.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { concreteTiles, crateTexture, labelTexture, glowTexture } from './textures.js';
+import { concreteTiles, crateTexture, labelTexture, glowTexture, gripTexture, cloudTexture } from './textures.js';
 import { CloneModel } from './cloneModel.js';
 import { LASER } from '../config.js';
 import { bodyBox } from '../sim/physics.js';
@@ -100,18 +100,19 @@ export class View {
       platform: mk(0xe2e2e2, 0.92),
       barrier: mk(0xcfd0d2, 0.9),
       ceiling: this.track(new THREE.MeshStandardMaterial({ map: tiles, color: 0x77797c, roughness: 1 })),
+      grip: this.track(new THREE.MeshStandardMaterial({ map: gripTexture(), color: 0xffffff, roughness: 0.5, emissive: new THREE.Color(0x1d4fa8), emissiveIntensity: 0.35 })),
     };
     const groups = {};
     for (const s of d.statics) {
       if (!mats[s.mat]) continue;
       const arr = groups[s.mat] || (groups[s.mat] = { pos: [], nor: [], uv: [], idx: [] });
       const bx = { min: s.b.slice(0, 3), max: s.b.slice(3, 6) };
-      addBox(arr, bx, 0.5, s.mat === 'floor' ? { ny: true } : s.mat === 'ceiling' ? { py: true } : {});
+      addBox(arr, bx, s.mat === 'grip' ? 1 : 0.5, s.mat === 'floor' ? { ny: true } : s.mat === 'ceiling' ? { py: true } : {});
     }
     for (const [mat, arr] of Object.entries(groups)) {
       const mesh = new THREE.Mesh(this.track(buildGeometry(arr)), mats[mat]);
       mesh.receiveShadow = mat !== 'ceiling';
-      mesh.castShadow = mat === 'wall' || mat === 'platform' || mat === 'barrier';
+      mesh.castShadow = mat === 'wall' || mat === 'platform' || mat === 'barrier' || mat === 'grip';
       mesh.matrixAutoUpdate = false;
       this.root.add(mesh);
     }
@@ -150,6 +151,7 @@ export class View {
     this._buildBeams();
     this._buildPreview();
     this._buildParticles();
+    this._buildSky();
   }
 
   _assignTags() {
@@ -263,6 +265,7 @@ export class View {
   _buildButtons() {
     const backMat = this.track(new THREE.MeshStandardMaterial({ color: 0x55595f, roughness: 0.6, metalness: 0.3 }));
     this.buttonViews = this.game.buttons.map((b) => {
+      if (b.style === 'target') return this._buildTarget(b);
       const group = new THREE.Group();
       const back = new THREE.Mesh(this.track(new RoundedBoxGeometry(0.4, 0.4, 0.05, 2, 0.015)), backMat);
       group.add(back);
@@ -279,6 +282,78 @@ export class View {
       this.root.add(group);
       return { b, cap, capMat, plaque };
     });
+  }
+
+  _buildTarget(b) {
+    const group = new THREE.Group();
+    const rings = [[0.42, 0xe9edf2], [0.32, 0x2a64c8], [0.21, 0xe9edf2], [0.1, 0x2a64c8]];
+    const mats = [];
+    rings.forEach(([r, c], i) => {
+      const m = this.track(new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, emissive: new THREE.Color(c === 0x2a64c8 ? BLUE : 0xffffff), emissiveIntensity: 0.05 }));
+      const disc = new THREE.Mesh(this.track(new THREE.CylinderGeometry(r, r, 0.06 + i * 0.012, 32)), m);
+      disc.rotation.x = Math.PI / 2;
+      disc.position.z = 0.03 + i * 0.006;
+      group.add(disc);
+      if (c === 0x2a64c8) mats.push(m);
+    });
+    const glow = new THREE.Sprite(this.track(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x5aa2ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })));
+    glow.scale.set(1.6, 1.6, 1); glow.position.z = 0.1;
+    group.add(glow);
+    const plaque = this._tagPlaque(b.id, 0.22);
+    if (plaque) { plaque.position.set(0, -0.6, 0.04); group.add(plaque); }
+    group.position.set(b.x, b.y, b.z);
+    group.rotation.y = Math.atan2(b.normal.x, b.normal.z);
+    this.root.add(group);
+    const capMat = { set emissiveIntensity(v) { for (const m of mats) m.emissiveIntensity = v; glow.material.opacity = Math.max(0, (v - 0.3) * 0.5); } };
+    return { b, cap: { position: { z: 0 } }, capMat, plaque, target: true };
+  }
+
+  _buildSky() {
+    const g = this.game;
+    if (!g.def.sky) return;
+    const [x0, z0, x1, z1] = g.def.bounds;
+    const mat = this.track(new THREE.SpriteMaterial({ map: cloudTexture(), color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, fog: true }));
+    const rand = (() => { let s = 1234 + g.def.id * 7; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; })();
+    this.clouds = [];
+    for (let i = 0; i < 46; i++) {
+      const c = new THREE.Sprite(mat);
+      const below = i < 30;
+      const sc = below ? 14 + rand() * 18 : 18 + rand() * 20;
+      c.scale.set(sc, sc * 0.45, 1);
+      c.position.set(x0 - 40 + rand() * (x1 - x0 + 80), below ? -18 - rand() * 14 : 18 + rand() * 20, z0 - 40 + rand() * (z1 - z0 + 80));
+      c.userData.drift = 0.2 + rand() * 0.4;
+      this.root.add(c);
+      this.clouds.push(c);
+    }
+    // Checkpoint markers: a thin blue ring on the floor
+    const ringMat = this.track(new THREE.MeshBasicMaterial({ color: 0x8cbcff, transparent: true, opacity: 0.45, depthWrite: false }));
+    this.checkpointViews = g.checkpoints.map((c) => {
+      const ring = new THREE.Mesh(this.track(new THREE.RingGeometry(0.42, 0.5, 6)), ringMat.clone());
+      this.track(ring.material);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(c.x, c.y + 0.012, c.z);
+      this.root.add(ring);
+      return { c, ring };
+    });
+  }
+
+  addTracer(from, to, kicked) {
+    const len = from.distanceTo(to);
+    if (len < 0.01) return;
+    const mat = this.track(new THREE.MeshBasicMaterial({ color: 0x8cc4ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    const geo = this.track(new THREE.CylinderGeometry(0.012, 0.03, 1, 6, 1, true));
+    geo.rotateX(Math.PI / 2);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(from).lerp(to, 0.5);
+    m.lookAt(to);
+    m.scale.set(1, 1, len);
+    this.root.add(m);
+    const ring = new THREE.Sprite(this.track(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x8cc4ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
+    ring.position.copy(to);
+    ring.scale.set(kicked ? 0.9 : 0.5, kicked ? 0.9 : 0.5, 1);
+    this.root.add(ring);
+    this.burst(to.x, to.y, to.z, kicked ? 18 : 8, 0x8cc4ff, { spread: 0.15, up: 0.6, life: 0.45, height: 0.05 });
+    (this.tracers || (this.tracers = [])).push({ m, ring, t: 0 });
   }
 
   _buildPods() {
@@ -615,6 +690,17 @@ export class View {
       v.topMat.emissiveIntensity = 0.15 + v.press * 1.1;
       this._setPlaque(v.plaque, v.p.pressed);
     }
+    if (this.tracers) {
+      for (let i = this.tracers.length - 1; i >= 0; i--) {
+        const tr = this.tracers[i];
+        tr.t += dt;
+        tr.m.material.opacity = Math.max(0, 0.9 - tr.t * 6);
+        tr.ring.material.opacity = Math.max(0, 1 - tr.t * 3);
+        if (tr.t > 0.4) { this.root.remove(tr.m); this.root.remove(tr.ring); this.tracers.splice(i, 1); }
+      }
+    }
+    if (this.clouds) for (const c of this.clouds) { c.position.x += c.userData.drift * dt; }
+    if (this.checkpointViews) for (const v of this.checkpointViews) v.ring.material.color.setHex(v.c.reached ? 0x5aa2ff : 0xcfe0ff);
     for (const v of this.buttonViews) {
       let glow = v.b.on ? 1.6 : 0.2;
       if (v.b.on && v.b.mode !== 'toggle') {

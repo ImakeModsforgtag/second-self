@@ -2,7 +2,9 @@
 
 A minimalist first-person puzzle game for VR (WebXR, Meta Quest) and desktop.
 You solve twelve concrete test chambers with three tools: a copy of yourself,
-mirrors that bend laser beams, and crates you can lift and stack.
+mirrors that bend laser beams, and crates you can lift and stack. Then the lift
+carries you above the clouds for eight sky chambers with a fourth tool: the
+Kickback gun.
 
 Built with Three.js, WebXR and Vite. Everything (textures, models, hands, sound)
 is generated in code, so there are no external assets to go missing.
@@ -34,7 +36,7 @@ npm run build
 npm run preview
 ```
 
-* `npm test` runs the mechanics checks and the automated playthrough that solves all 12 levels.
+* `npm test` runs the mechanics checks and the automated playthrough that solves all 20 levels.
 * `npm run build` makes the production files in `dist`.
 * `npm run preview` serves the production build at http://localhost:4173.
 
@@ -104,6 +106,7 @@ Any WebXR browser with a headset works too (for example Chrome with a PC VR head
 | Grip | Grab a crate or portable mirror (reach for it, or point at it). Twist your wrist to turn it. Grip a fixed mirror and twist to rotate it |
 | Trigger | Use: press switches, turn mirrors, create a clone at a pod |
 | Touch a wall switch | Presses it |
+| Right trigger (sky chambers) | Fire the Kickback gun. Left trigger then handles switches and mirrors |
 | A | Jump |
 | B | Create clone |
 | X | Reset clone |
@@ -124,6 +127,7 @@ Settings include smooth or teleport-only movement, snap angle, and a comfort vig
 | F | Create clone |
 | R | Reset clone |
 | Space | Jump |
+| Right mouse or G | Fire the Kickback gun (sky chambers) |
 | Esc | Pause |
 
 Keys can be rebound in **Settings**.
@@ -150,6 +154,15 @@ lock: its door wants it dark.
 press plates, block beams, and make stairs. A blue footprint shows where a held
 crate will land.
 
+**The Kickback gun** (chambers 13 to 20). The pulse pushes you away from
+whatever it hits within about 4.5 m: shoot the floor to launch about twice as
+high as a jump, shoot a wall in front of you to fly backward across a gap, and
+shoot a wall just under you to kick upward. You get two shots per jump (the
+pips on the gun and under the crosshair); they refill when you land or touch a
+blue grip panel, so grip panels can be climbed as high as they go. Pulses also
+press switches and bullseye targets and turn mirrors one step from far away.
+Falling off returns you to the last checkpoint ring you stood on.
+
 **Doors** show a lamp for each requirement, with a letter that matches the
 plate, receiver or switch that feeds it. Some doors stay open once triggered;
 others need their conditions held. Doors will not close on you.
@@ -171,11 +184,19 @@ others need their conditions held. Doors will not close on you.
 | 9 | Build Your Way Out | Very hard | Two chambers combining every mechanic, with an order that matters |
 | 10 | Elevation | Very hard | Stacking crates to lift a mirror into a high beam, plus a climb |
 | 11 | Mirror Image | Very hard | A mirror used as a blocker, a shelf plate, and a clone watching a doorway |
-| 12 | The Final Experiment | Extremely hard | Four chambers and a stair corridor, all mechanics together, ending in the lift |
+| 12 | The Final Experiment | Extremely hard | Four chambers and a stair corridor, all mechanics together, ending in the lift to the sky |
+| 13 | Kickback | Easy | The Kickback gun: gun jumps and shooting a bullseye |
+| 14 | Wall Climber | Easy to medium | Blue grip panels versus plain concrete |
+| 15 | Rebound | Medium | Wall bounces across gaps |
+| 16 | Trick Shots | Medium to hard | Turning floating mirrors and hitting far targets with shots |
+| 17 | Updraft | Hard | Carrying a crate while you launch, crate steps |
+| 18 | Sky Copy | Hard | Your clone holds a plate while you climb a tower for a hidden bullseye |
+| 19 | Crosswind | Very hard | Bounce, shoot three floating mirrors (one turns a lock beam aside), climb |
+| 20 | The Summit | Extremely hard | Clone, both crates, two beams, a lock, a bullseye and a climb, ending in the final ascent |
 
 Every level is hand built and has a verified solution: `tests/playthrough.mjs`
-solves all twelve using only player actions (walk, jump, look, grab, interact,
-create clone). The clone is moved only by its own AI.
+solves all twenty using only player actions (walk, jump, look, grab, interact,
+create clone, fire). The clone is moved only by its own AI.
 
 ---
 
@@ -190,7 +211,7 @@ src/sim/                pure game logic (runs in the browser and in Node tests)
   clone.js              clone AI (field of view, line of sight, walking)
   laser.js              beam tracing and mirror reflection
   game.js               plates, buttons, doors, receivers, pods, exits, hints
-src/levels/             level builder and the twelve chambers
+src/levels/             level builder, chambers 1 to 12 (levels.js), sky chambers 13 to 20 (sky.js)
 src/render/             view (scene building), procedural textures, hands, clone model
 src/input/              desktop (keyboard/mouse) and VR controllers
 src/ui/                 HTML menus and the in-headset VR panel

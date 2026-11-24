@@ -22,7 +22,7 @@ export class DesktopInput {
       if (this.app.state === 'playing' && !this.locked && !this.app.inXR) { this.lock(); return; }
       if (!this.locked || this.app.state !== 'playing') return;
       if (e.button === 0) this.app.desktopGrab();
-      if (e.button === 2) this.app.desktopRotate(-1);
+      if (e.button === 2) { if (this.app.game && this.app.game.hasGun) this.app.fireGun(); else this.app.desktopRotate(-1); }
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -50,6 +50,7 @@ export class DesktopInput {
         else if (e.code === b.rotateLeft) this.app.desktopRotate(-1);
         else if (e.code === b.clone) this.app.doCreateClone();
         else if (e.code === b.resetClone) this.app.doResetClone();
+        else if (e.code === b.fire) this.app.fireGun();
         else if (e.code === b.pause || e.code === 'Escape') this.app.pause();
       } else if (e.code === 'Escape' && this.app.state === 'paused' && this.app.menu.current !== 'pause') {
         this.app.menu.back();

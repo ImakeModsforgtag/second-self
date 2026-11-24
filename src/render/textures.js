@@ -233,3 +233,62 @@ export function glowTexture() {
   cache.glow = tex;
   return tex;
 }
+
+/** Blue grip panel: white-edged tiles with a raised dot grid (1 m per repeat). */
+export function gripTexture() {
+  if (cache.grip) return cache.grip;
+  const s = 256;
+  const c = canvas(s);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#2f6fd6'; ctx.fillRect(0, 0, s, s);
+  const g = ctx.createLinearGradient(0, 0, s, s);
+  g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(1, 'rgba(0,0,0,0.12)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  ctx.fillStyle = 'rgba(235,243,255,0.85)';
+  for (let y = 24; y < s; y += 42) for (let x = 24 + ((y / 42) % 2) * 21; x < s; x += 42) { ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = '#e9f1ff'; ctx.lineWidth = 8; ctx.strokeRect(4, 4, s - 8, s - 8);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  cache.grip = tex;
+  return tex;
+}
+
+/** Bright sky gradient used as the background for the sky chambers. */
+export function skyTexture() {
+  if (cache.sky) return cache.sky;
+  const c = canvas(32, 512);
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0, '#4f86c9');
+  g.addColorStop(0.42, '#9cc3ea');
+  g.addColorStop(0.5, '#dde9f4');
+  g.addColorStop(0.58, '#c9d9e9');
+  g.addColorStop(1, '#8fa6bd');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 32, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  cache.sky = tex;
+  return tex;
+}
+
+/** Soft cloud puff. */
+export function cloudTexture() {
+  if (cache.cloud) return cache.cloud;
+  const s = 256;
+  const c = canvas(s);
+  const ctx = c.getContext('2d');
+  const rand = rng(42);
+  for (let i = 0; i < 26; i++) {
+    const x = s * (0.2 + rand() * 0.6), y = s * (0.35 + rand() * 0.3), r = s * (0.08 + rand() * 0.14);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  cache.cloud = tex;
+  return tex;
+}

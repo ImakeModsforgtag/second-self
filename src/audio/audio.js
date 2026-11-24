@@ -202,6 +202,25 @@ export class Audio {
         [130.8, 196, 261.6, 329.6, 392, 523.3].forEach((f, i) => this._tone(out, { f0: f, dur: 7, t: i * 0.25, a: 2, vol: 0.06 }));
         this._noise(out, { dur: 6, type: 'bandpass', f: 300, f1: 6000, q: 0.5, a: 3, vol: 0.06 });
         break;
+      case 'shot':
+        this._tone(out, { type: 'square', f0: 900, f1: 300, dur: 0.12, vol: 0.06 });
+        this._noise(out, { dur: 0.12, type: 'bandpass', f: 2600, f1: 900, q: 3, vol: 0.12 });
+        break;
+      case 'kick':
+        this._tone(out, { f0: 140, f1: 55, dur: 0.25, vol: 0.32 });
+        this._noise(out, { dur: 0.35, type: 'lowpass', f: 1800, f1: 300, vol: 0.28 });
+        this._tone(out, { type: 'square', f0: 900, f1: 300, dur: 0.1, vol: 0.05 });
+        break;
+      case 'dry':
+        this._tone(out, { type: 'square', f0: 220, dur: 0.03, vol: 0.05 });
+        break;
+      case 'grip':
+        this._tone(out, { f0: 1320, f1: 1760, dur: 0.12, vol: 0.05 });
+        break;
+      case 'checkpoint':
+        this._tone(out, { f0: 660, dur: 0.25, vol: 0.07 });
+        this._tone(out, { f0: 990, dur: 0.35, t: 0.09, vol: 0.07 });
+        break;
       case 'tick':
         this._tone(out, { type: 'square', f0: (opts.left || 5) <= 3 ? 1400 : 1000, dur: 0.04, vol: 0.05 });
         break;

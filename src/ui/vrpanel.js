@@ -59,11 +59,11 @@ export class VRPanel {
     const cx = W / 2 - 210;
     if (this.page === 'main' || this.page === 'levels') {
       LEVELS.forEach((lv, i) => {
-        const col = i % 3, row = Math.floor(i / 3);
-        add(`${lv.id}. ${lv.name}`, 'level:' + lv.id, 40 + col * 318, 160 + row * 84, 302, 70, lv.id <= app.save.unlocked);
+        const col = i % 4, row = Math.floor(i / 4);
+        add(`${lv.id}. ${lv.name}`, 'level:' + lv.id, 34 + col * 240, 152 + row * 72, 228, 62, lv.id <= app.save.unlocked);
       });
-      add(`Movement: ${app.save.settings.vrMovement === 'smooth' ? 'Smooth + teleport' : 'Teleport only'}`, 'toggle-move', 70, 530, 430, 64);
-      add('Exit VR', 'exit-vr', 520, 530, 430, 64);
+      add(`Movement: ${app.save.settings.vrMovement === 'smooth' ? 'Smooth + teleport' : 'Teleport only'}`, 'toggle-move', 70, 528, 430, 60);
+      add('Exit VR', 'exit-vr', 520, 528, 430, 60);
     } else if (this.page === 'pause') {
       add('Resume', 'resume', cx, 150);
       add('Restart chamber', 'restart', cx, 235);
@@ -102,13 +102,13 @@ export class VRPanel {
     if (this.page === 'main' || this.page === 'levels') c.fillText('Point and pull the trigger. Y opens this menu during play.', W / 2, 135);
     if (this.page === 'complete') c.fillText(this.app.lastStats || '', W / 2, 180);
     if (this.page === 'final') { c.fillText('Subject and copy have been released.', W / 2, 200); c.fillText(this.app.lastStats || '', W / 2, 245); }
-    if (this.page === 'pause') c.fillText('Grip: grab  Trigger: use  A: jump  B: clone  X: reset clone', W / 2, 125);
+    if (this.page === 'pause') c.fillText(this.app.game && this.app.game.hasGun ? 'Right trigger: fire  Left trigger: use  Grip: grab  A: jump  B: clone' : 'Grip: grab  Trigger: use  A: jump  B: clone  X: reset clone', W / 2, 125);
     this.buttons.forEach((bt, i) => {
       c.fillStyle = !bt.enabled ? 'rgba(44,47,52,0.5)' : i === this.hover ? '#3361a3' : '#2c2f34';
       roundRect(c, bt.x, bt.y, bt.w, bt.h, 10); c.fill();
       c.strokeStyle = i === this.hover ? '#8cbcff' : '#4a4d52'; c.lineWidth = 2; c.stroke();
       c.fillStyle = bt.enabled ? '#e6e7e9' : '#666a70';
-      c.font = bt.w < 320 ? '24px system-ui, sans-serif' : '28px system-ui, sans-serif';
+      c.font = bt.w < 240 ? '20px system-ui, sans-serif' : bt.w < 320 ? '24px system-ui, sans-serif' : '28px system-ui, sans-serif';
       c.textAlign = 'center';
       c.fillText(bt.label, bt.x + bt.w / 2, bt.y + bt.h / 2 + 10);
     });

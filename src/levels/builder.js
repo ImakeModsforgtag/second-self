@@ -13,7 +13,7 @@ export function buildLevel(def) {
   const data = {
     statics: [], pods: [], plates: [], buttons: [], emitters: [], receivers: [],
     mirrors: [], sockets: [], blocks: [], doors: [], exits: [], hints: [], lights: [],
-    wires: [], decals: [], start: def.start, height: H, bounds: def.bounds,
+    wires: [], decals: [], checkpoints: [], start: def.start, height: H, bounds: def.bounds,
   };
 
   const S = (x0, y0, z0, x1, y1, z1, mat = 'wall', extra = {}) => {
@@ -45,15 +45,27 @@ export function buildLevel(def) {
 
     door({ id, x, z, axis, width = 2, height = 2.7, y0 = 0, requires = [], latch = false, exit = false }) {
       data.doors.push({ id, x, z, axis, width, height, y0, requires, latch, exit });
-      // Header above the door opening.
-      if (axis === 'x') S(x - width / 2, y0 + height, z - T / 2, x + width / 2, H, z + T / 2, 'wall');
-      else S(x - T / 2, y0 + height, z - width / 2, x + T / 2, H, z + width / 2, 'wall');
+      // Header above the door opening (a short lintel in the open sky).
+      const top = def.sky ? y0 + height + 0.5 : H;
+      if (axis === 'x') S(x - width / 2, y0 + height, z - T / 2, x + width / 2, top, z + T / 2, 'wall');
+      else S(x - T / 2, y0 + height, z - width / 2, x + T / 2, top, z + width / 2, 'wall');
     },
     plate({ id, x, z, w = 1.6, d = 1.6, y = 0 }) {
       data.plates.push({ id, x0: x - w / 2, z0: z - d / 2, x1: x + w / 2, z1: z + d / 2, y, x, z });
     },
     button({ id, x, y, z, facing, mode = 'toggle', duration }) {
       data.buttons.push({ id, x, y, z, normal: NORMALS[facing], facing, mode, duration });
+    },
+    /** Bullseye target: a switch made to be shot with the Kickback gun. */
+    target({ id, x, y, z, facing, mode = 'toggle', duration }) {
+      data.buttons.push({ id, x, y, z, normal: NORMALS[facing], facing, mode, duration, style: 'target' });
+    },
+    /** Solid block from (x0,y0,z0) to (x1,y1,z1). */
+    block(x0, y0, z0, x1, y1, z1, mat = 'platform') { S(x0, y0, z0, x1, y1, z1, mat); },
+    /** Blue grip panel wall: touching it refills your Kickback shots. */
+    grip(x0, z0, x1, z1, y0, y1) { S(x0, y0, z0, x1, y1, z1, 'grip'); },
+    checkpoint({ x, z, y = 0, w = 3, d = 3, yaw }) {
+      data.checkpoints.push({ x, z, y, x0: x - w / 2, z0: z - d / 2, x1: x + w / 2, z1: z + d / 2, yaw: yaw === undefined ? undefined : (yaw * Math.PI) / 180 });
     },
     pod({ x, z, y = 0, yaw = 0, id }) {
       data.pods.push({ x, z, y, yaw: (yaw * Math.PI) / 180, id });
@@ -76,10 +88,10 @@ export function buildLevel(def) {
     decal(kind, x, z, y = 0, extra = {}) { data.decals.push({ kind, x, z, y, ...extra }); },
   };
 
-  // Floor and ceiling over the whole footprint.
+  // Floor and ceiling over the whole footprint (sky chambers have neither).
   const [bx0, bz0, bx1, bz1] = def.bounds;
-  S(bx0, -0.5, bz0, bx1, 0, bz1, 'floor');
-  if (def.ceilingHoles) {
+  if (!def.sky) S(bx0, -0.5, bz0, bx1, 0, bz1, 'floor');
+  if (def.sky) { /* open air */ } else if (def.ceilingHoles) {
     // Simple split: ceiling around one rectangular hole.
     const [hx0, hz0, hx1, hz1] = def.ceilingHoles[0];
     S(bx0, H, bz0, bx1, H + 0.4, hz0, 'ceiling');

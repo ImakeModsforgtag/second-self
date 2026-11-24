@@ -32,6 +32,7 @@ export class VRControls {
         c.hand.root.rotation.set(-0.35, 0, c.handed === 'left' ? Math.PI / 2 : -Math.PI / 2);
         c.hand.root.position.set(c.handed === 'left' ? 0.01 : -0.01, -0.01, 0.06);
         grip.add(c.hand.root);
+        if (c.handed === 'right') { c.gunSlot = new THREE.Group(); c.gunSlot.position.set(0, 0.01, -0.03); c.gunSlot.rotation.x = -0.6; grip.add(c.gunSlot); }
       });
       ray.addEventListener('disconnected', () => { c.gp = null; c.handed = null; });
       return c;
@@ -110,6 +111,11 @@ export class VRControls {
     const left = this.ctrls.find((c) => c.handed === 'left');
     const right = this.ctrls.find((c) => c.handed === 'right');
     for (const c of this.ctrls) {
+      if (c.gunSlot) {
+        const want = !!(app.game && app.game.hasGun && !app.backdrop);
+        if (want && app.gun.root.parent !== c.gunSlot) { c.gunSlot.add(app.gun.root); app.gun.root.position.set(0, 0, 0); app.gun.root.rotation.set(0, 0, 0); }
+        app.gun.root.visible = want;
+      }
       if (c.hand) {
         const grip = this.value(c, 1), trig = this.value(c, 0);
         const holding = app.game && app.game.held && app.game.held.hand === c.i;
@@ -266,7 +272,8 @@ export class VRControls {
       c.lineMat.color.setHex(usable ? 0x8cbcff : 0xffffff);
       c.lineMat.opacity = usable || (hit && hit.kind === 'block') ? 0.85 : 0.3;
       if (this.down(c, 0)) {
-        if (heldHere) game.rotateHeld(1);
+        if (game.hasGun && c.handed === 'right' && !heldHere) { app.fireGun(r.o, r.d); this._pulse(c, 0.9, 70); }
+        else if (heldHere) game.rotateHeld(1);
         else if (usable) { game.interact(r.o, r.d); this._pulse(c, 0.4, 30); }
       }
     }

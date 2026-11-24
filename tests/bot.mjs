@@ -113,6 +113,28 @@ export class Bot {
     return ok;
   }
 
+  /** Fire the Kickback gun at a world point (or along yaw/pitch). */
+  fire(pt) {
+    if (pt) this.lookAt(pt);
+    const h = this.g.fire(this.eye(), this.fwd());
+    if (!h) throw new Error('gun did not fire (cooldown or no charges) at t=' + this.g.time.toFixed(2));
+    return h;
+  }
+
+  fireDir(yaw, pitch) {
+    this.g.player.yaw = yaw; this.g.player.pitch = pitch;
+    const h = this.g.fire(this.eye(), this.fwd());
+    if (!h) throw new Error('gun did not fire (cooldown or no charges)');
+    return h;
+  }
+
+  /** Run frames while holding a movement velocity; stop early when cond() is true. */
+  hold(move, sec, cond = null, jump = false) {
+    const n = Math.round(sec / DT);
+    for (let i = 0; i < n; i++) { if (cond && cond()) return true; this.tick(move, jump && i === 0); }
+    return cond ? cond() : true;
+  }
+
   rotateMirrorTo(id, step) {
     const m = this.g.mirrors.find((mm) => mm.id === id);
     const c = { x: m.body.pos.x, y: m.body.pos.y + 0.75, z: m.body.pos.z };

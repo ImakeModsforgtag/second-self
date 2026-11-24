@@ -132,5 +132,38 @@ const room = (build, extra = {}) => ({
   ok(g.doors[0].t === 0, 'door closes once the doorway is clear');
 }
 
+// 9. Kickback gun
+{
+  const sky = (build) => ({ id: 98, name: 'gun', gun: true, sky: true, bounds: [-20, -20, 20, 20], height: 40, start: { x: 0, z: 0, yaw: 0 },
+    build(b) { b.block(-20, -1, -20, 20, 0, 20); build(b); } });
+  const peak = (g) => { let m = 0; for (let i = 0; i < 120; i++) { g.update(1 / 60, {}); m = Math.max(m, g.player.body.pos.y); } return m; };
+  const down = { x: 0, y: -1, z: 0 };
+  let g = new Game(sky(() => {})); run(g, 0.2);
+  g.fire(g.playerHead(), down);
+  const h = peak(g);
+  ok(h > 2.1 && h < 2.6, `shooting the floor launches you (${h.toFixed(2)} m, a jump is 1.15 m)`);
+  g = new Game(sky(() => {})); run(g, 0.2);
+  g.fire(g.playerHead(), { x: 0, y: 0, z: -1 });
+  ok(g.player.vel.z === 0 && g.player.body.vy === 0, 'shooting into the distance does not push you');
+  g = new Game(sky(() => {})); run(g, 0.2);
+  g.player.body.pos.y = 6; g.player.body.grounded = false; g.player.charges = 2;
+  g.fire(g.playerHead(), down); run(g, 0.3); g.fire(g.playerHead(), down); run(g, 0.3);
+  ok(g.player.charges === 0 && g.fire(g.playerHead(), down) === null, 'two shots per jump, then empty until you land');
+  run(g, 3);
+  ok(g.player.charges === 2, 'shots refill on landing');
+  g = new Game(sky((b) => b.grip(-3, -3, 3, -2, 0, 20))); run(g, 0.2);
+  g.player.body.pos.z = -1.73; g.player.body.pos.y = 4; g.player.body.grounded = false; g.player.charges = 0;
+  g.update(1 / 60, { move: { x: 0, z: -3 } });
+  ok(g.player.charges === 2, 'touching a blue grip panel refills your shots');
+  g = new Game(sky((b) => { b.block(-1, 0, -12.5, 1, 6, -12, 'wall'); b.target({ id: 'T', x: 0, y: 2, z: -11.95, facing: 'S' }); b.mirror({ id: 'M', x: 5, z: -10, step: 0 }); }));
+  run(g, 0.2);
+  const e = g.playerHead();
+  const aim = (p) => { const d = { x: p.x - e.x, y: p.y - e.y, z: p.z - e.z }; const l = Math.hypot(d.x, d.y, d.z); return { x: d.x / l, y: d.y / l, z: d.z / l }; };
+  g.fire(e, aim({ x: 0, y: 2, z: -11.95 })); run(g, 0.1);
+  ok(g.inputOn('T'), 'a shot presses a bullseye from 12 m away');
+  run(g, 0.4); g.fire(e, aim({ x: 5, y: 0.75, z: -10 })); run(g, 0.1);
+  ok(g.mirrors[0].step === 1, 'a shot turns a mirror one step');
+}
+
 if (fails) { console.log(`\n${fails} mechanic check(s) failed`); process.exit(1); }
 console.log('\nAll mechanic checks passed.');

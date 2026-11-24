@@ -634,4 +634,7 @@ const RAW_LEVELS = [
 ];
 
 // Chamber numbers follow the order above.
-export const LEVELS = RAW_LEVELS.map((lv, i) => ({ ...lv, id: i + 1 }));
+import { SKY_LEVELS } from './sky.js';
+
+const ALL = [...RAW_LEVELS, ...SKY_LEVELS];
+export const LEVELS = ALL.map((lv, i, all) => ({ ...lv, id: i + 1, isLast: i === all.length - 1 }));

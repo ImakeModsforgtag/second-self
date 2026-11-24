@@ -36,6 +36,19 @@ export const CLONE = {
   spawnTime: 1.1,
 };
 
+export const GUN = {
+  range: 40,              // pulses travel this far (switches, targets, mirrors)
+  kickRange: 4.5,         // surfaces closer than this push you
+  fullDist: 1.0,          // full push at or inside this distance
+  kick: 9.5,              // m/s at full strength
+  carry: 0.35,            // share of existing speed kept when kicked the same way
+  charges: 2,             // shots per jump; refilled on the ground or a grip panel
+  cooldown: 0.28,
+  airAccel: 9,            // mid-air steering
+  groundAccel: 32,
+  airDrag: 0.25,
+};
+
 export const LASER = {
   height: 0.75,           // beams travel this far above the surface the emitter sits on
   maxBounces: 24,
@@ -69,6 +82,7 @@ export const DEFAULT_BINDINGS = {
   clone: 'KeyF',
   resetClone: 'KeyR',
   slow: 'ShiftLeft',
+  fire: 'KeyG',
   pause: 'Escape',
 };
 
@@ -83,6 +97,7 @@ export const BINDING_LABELS = {
   clone: 'Create clone',
   resetClone: 'Reset clone',
   slow: 'Walk slowly',
+  fire: 'Fire Kickback gun (also right mouse)',
   pause: 'Pause',
 };
 

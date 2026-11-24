@@ -157,3 +157,8 @@ button:disabled { opacity: 0.4; cursor: default; }
   .row { flex-wrap: wrap; }
   .row input[type="range"], .row select, .row .keybtn { width: 100%; }
 }
+
+#ammo { position: absolute; left: 50%; top: calc(50% + 12px); transform: translateX(-50%); display: flex; gap: 6px; }
+#ammo i { width: 7px; height: 7px; border-radius: 50%; background: rgba(40, 46, 56, 0.8); box-shadow: 0 0 2px #000; }
+#ammo i.on { background: #8cc4ff; box-shadow: 0 0 6px #5aa2ff; }
+#prompt { top: calc(50% + 34px); }

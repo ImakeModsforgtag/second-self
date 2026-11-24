@@ -4,7 +4,7 @@
 import { PhysicsWorld, box, bodyBox, overlaps } from './physics.js';
 import { Clone, wrapAngle } from './clone.js';
 import { traceLasers, collectBlockers } from './laser.js';
-import { PLAYER, LASER, MIRROR_STEPS } from '../config.js';
+import { PLAYER, LASER, MIRROR_STEPS, GUN } from '../config.js';
 import { buildLevel } from '../levels/builder.js';
 
 const DIRS = { E: 0, S: 90, W: 180, N: 270 };
@@ -39,7 +39,7 @@ export class Game {
   // ------------------------------------------------------------ setup
   _setup() {
     const d = this.data;
-    for (const s of d.statics) this.world.addStatic(box(...s.b, { mat: s.mat, noLaser: !!s.noLaser, seeThrough: !!s.seeThrough }));
+    for (const s of d.statics) this.world.addStatic(box(...s.b, { mat: s.mat, noLaser: !!s.noLaser, seeThrough: !!s.seeThrough, grip: s.mat === 'grip' }));
 
     // Player
     const st = d.start;
@@ -51,7 +51,13 @@ export class Game {
       stepDist: 0,
       airT: 0,
       spawn: { ...st },
+      vel: { x: 0, z: 0 },
+      charges: GUN.charges,
+      cool: 0,
     };
+    this.hasGun = !!this.def.gun;
+    this.killY = this.def.killY ?? -12;
+    this.checkpoints = (d.checkpoints || []).map((c) => ({ ...c, reached: false }));
     this.player.body.ignore = (o) => this.held && o === this.held.body;
 
     // Pods
@@ -63,7 +69,8 @@ export class Game {
     // Buttons (wall switches)
     this.buttons = d.buttons.map((b) => {
       const n = b.normal;
-      const bx = box(b.x - 0.2 + (n.x ? 0 : 0), b.y - 0.2, b.z - 0.2, b.x + 0.2, b.y + 0.2, b.z + 0.2);
+      const r = b.style === 'target' ? 0.42 : 0.2;
+      const bx = box(b.x - r, b.y - r, b.z - r, b.x + r, b.y + r, b.z + r);
       // flatten along the normal
       if (n.x) { bx.min[0] = b.x - 0.08; bx.max[0] = b.x + 0.08; }
       if (n.z) { bx.min[2] = b.z - 0.08; bx.max[2] = b.z + 0.08; }
@@ -401,7 +408,9 @@ export class Game {
       this._teleport(input.teleport, solids);
     }
     const before = { x: pb.pos.x, z: pb.pos.z };
-    w.moveHorizontal(pb, mv.x * dt, mv.z * dt, solids, PLAYER.step);
+    if (input.fire) this.fire(input.fire.origin, input.fire.dir);
+    if (this.hasGun) this._moveWithMomentum(dt, mv, solids);
+    else w.moveHorizontal(pb, mv.x * dt, mv.z * dt, solids, PLAYER.step);
     if (input.jump && pb.grounded) { pb.vy = PLAYER.jumpSpeed; pb.grounded = false; this.emit('jump'); }
     const wasGrounded = pb.grounded;
     const vyBefore = pb.vy;
@@ -413,7 +422,9 @@ export class Game {
       if (pl.stepDist > 0.7) { pl.stepDist = 0; this.emit('step'); }
     }
     w.depenetrate(pb, w.solidsFor(pb, this.solidsTmp), 0.5);
-    if (pb.pos.y < -12) this._respawnPlayer();
+    if (this.hasGun) this._updateGun(dt);
+    this._updateCheckpoints();
+    if (pb.pos.y < this.killY) this._respawnPlayer();
 
     // ---- Held object follows its target, colliding with the world
     if (this.held) this._updateHeld(dt);
@@ -427,11 +438,14 @@ export class Game {
       const was = b.grounded, v0 = b.vy;
       w.applyGravity(b, dt, s);
       if (!was && b.grounded && v0 < -3) this.emit('thud', { x: b.pos.x, y: b.pos.y, z: b.pos.z, speed: -v0 });
-      if (b.pos.y < -12) this._respawnBody(b);
+      if (b.pos.y < this.killY) this._respawnBody(b);
     }
 
     // ---- Clone
-    if (this.clone) this.clone.update(dt, w.solidsFor(this.clone.body, this.solidsTmp));
+    if (this.clone) {
+      this.clone.update(dt, w.solidsFor(this.clone.body, this.solidsTmp));
+      if (this.clone.pos.y < this.killY) { this.removeClone(); this.emit('toast', { text: 'Your clone fell. Make a new one at a pod.' }); }
+    }
 
     // ---- Logic network
     this._updateLogic(dt);
@@ -450,6 +464,103 @@ export class Game {
     // ---- Hints and exits
     this._updateHints();
     this._checkExit();
+  }
+
+  // ------------------------------------------------------------ Kickback gun
+  _moveWithMomentum(dt, mv, solids) {
+    const pl = this.player, pb = pl.body, v = pl.vel;
+    const tx = mv.x || 0, tz = mv.z || 0;
+    if (pb.grounded) {
+      const dx = tx - v.x, dz = tz - v.z, l = Math.hypot(dx, dz), a = GUN.groundAccel * dt;
+      if (l <= a) { v.x = tx; v.z = tz; } else { v.x += (dx / l) * a; v.z += (dz / l) * a; }
+    } else if (tx || tz) {
+      // Air control: speed up toward the input direction (never slows a launch
+      // that already goes that way) and gently trim sideways drift.
+      const ts = Math.hypot(tx, tz), ux = tx / ts, uz = tz / ts, a = GUN.airAccel * dt;
+      let vp = v.x * ux + v.z * uz;
+      let px = v.x - vp * ux, pz = v.z - vp * uz;
+      if (vp < ts) vp = Math.min(ts, vp + a);
+      const pl = Math.hypot(px, pz);
+      if (pl > 0) { const k = Math.max(0, pl - a * 0.6) / pl; px *= k; pz *= k; }
+      v.x = vp * ux + px; v.z = vp * uz + pz;
+    } else {
+      const k = Math.max(0, 1 - GUN.airDrag * dt);
+      v.x *= k; v.z *= k;
+    }
+    const r = this.world.moveHorizontal(pb, v.x * dt, v.z * dt, solids, PLAYER.step);
+    if (Math.abs(r.mx - v.x * dt) > 1e-5) v.x = 0;
+    if (Math.abs(r.mz - v.z * dt) > 1e-5) v.z = 0;
+  }
+
+  _updateGun(dt) {
+    const pl = this.player, pb = pl.body;
+    pl.cool = Math.max(0, pl.cool - dt);
+    if (pb.grounded && pl.charges < GUN.charges) { pl.charges = GUN.charges; this.emit('recharge'); }
+    if (!pb.grounded && pl.charges < GUN.charges && this.touchingGrip()) { pl.charges = GUN.charges; this.emit('grip', { x: pb.pos.x, y: pb.pos.y + 1, z: pb.pos.z }); }
+  }
+
+  touchingGrip() {
+    const b = bodyBox(this.player.body);
+    const m = 0.07;
+    for (const s of this.world.statics) {
+      if (!s.grip) continue;
+      if (b.min[0] - m < s.max[0] && b.max[0] + m > s.min[0] && b.min[1] < s.max[1] && b.max[1] > s.min[1] && b.min[2] - m < s.max[2] && b.max[2] + m > s.min[2]) return true;
+    }
+    return false;
+  }
+
+  /** Fire the Kickback gun from origin along unit dir. Returns the hit (or null). */
+  fire(origin, dir) {
+    const pl = this.player, pb = pl.body;
+    if (!this.hasGun) return null;
+    if (pl.cool > 0) return null;
+    if (pl.charges <= 0) { this.emit('dry'); pl.cool = 0.15; return null; }
+    pl.cool = GUN.cooldown;
+    pl.charges--;
+    const ray = PhysicsWorld.rayBox;
+    let best = { t: GUN.range, kind: null, obj: null };
+    const consider = (bx, kind, obj) => { const t = ray(origin, dir, bx, best.t); if (t >= 0 && t < best.t) best = { t, kind, obj }; };
+    for (const s of this.world.statics) consider(s, 'solid', null);
+    for (const d of this.doors) consider(d.box(), 'solid', null);
+    for (const b of this.buttons) consider(b.box, 'button', b);
+    for (const body of this.world.bodies) {
+      if (body.removed || body.kind === 'player' || (this.held && body === this.held.body)) continue;
+      consider(bodyBox(body), body.kind === 'mirror' ? 'mirror' : 'solid', body.mirror || null);
+    }
+    const hit = best.kind ? { x: origin.x + dir.x * best.t, y: origin.y + dir.y * best.t, z: origin.z + dir.z * best.t } : null;
+    if (best.kind === 'button') this.pressButton(best.obj);
+    if (best.kind === 'mirror') this.rotateMirror(best.obj, 1);
+    let kicked = false;
+    if (hit) {
+      const c = { x: pb.pos.x, y: pb.pos.y + 0.85, z: pb.pos.z };
+      const d = Math.hypot(hit.x - c.x, hit.y - c.y, hit.z - c.z);
+      if (d < GUN.kickRange) {
+        const s = GUN.kick * Math.min(1, (GUN.kickRange - d) / (GUN.kickRange - GUN.fullDist));
+        const ix = -dir.x * s, iy = -dir.y * s, iz = -dir.z * s;
+        const add = (v, imp) => (imp > 0 ? Math.max(v + GUN.carry * imp, imp) : imp < 0 ? Math.min(v + GUN.carry * imp, imp) : v);
+        pl.vel.x = add(pl.vel.x, ix);
+        pl.vel.z = add(pl.vel.z, iz);
+        pb.vy = add(pb.vy, iy);
+        if (iy > 0.5) pb.grounded = false;
+        kicked = true;
+      }
+    }
+    this.emit('shot', { ox: origin.x, oy: origin.y, oz: origin.z, hx: hit ? hit.x : origin.x + dir.x * GUN.range, hy: hit ? hit.y : origin.y + dir.y * GUN.range, hz: hit ? hit.z : origin.z + dir.z * GUN.range, kicked, hitKind: best.kind, x: origin.x, y: origin.y, z: origin.z });
+    return { ...best, point: hit, kicked };
+  }
+
+  _updateCheckpoints() {
+    const p = this.player.body.pos;
+    for (const c of this.checkpoints) {
+      if (p.x > c.x0 && p.x < c.x1 && p.z > c.z0 && p.z < c.z1 && Math.abs(p.y - c.y) < 0.6 && this.player.body.grounded) {
+        const s = this.player.spawn;
+        if (s.x !== c.x || s.z !== c.z || s.y !== c.y) {
+          this.player.spawn = { x: c.x, y: c.y, z: c.z, yaw: c.yaw ?? this.player.yaw };
+          if (!c.reached) this.emit('checkpoint', { x: c.x, y: c.y, z: c.z });
+          c.reached = true;
+        }
+      }
+    }
   }
 
   _teleport(t, solids) {
@@ -481,7 +592,10 @@ export class Game {
     const s = this.player.spawn;
     const pb = this.player.body;
     pb.pos.x = s.x; pb.pos.y = (s.y || 0) + 0.05; pb.pos.z = s.z; pb.vy = 0;
-    this.emit('toast', { text: 'Recovered.' });
+    this.player.vel.x = 0; this.player.vel.z = 0;
+    if (this.held) this.release();
+    this.emit('toast', { text: this.hasGun ? 'Back to the last checkpoint.' : 'Recovered.' });
+    this.emit('respawn');
   }
 
   _respawnBody(b) {
@@ -589,7 +703,7 @@ export class Game {
     pb.pos.x += ((e.x0 + e.x1) / 2 - pb.pos.x) * Math.min(1, dt * 2);
     pb.pos.z += ((e.z0 + e.z1) / 2 - pb.pos.z) * Math.min(1, dt * 2);
     if (this.clone) this.clone.update(dt, this.world.solidsFor(this.clone.body, this.solidsTmp));
-    if (f.t > 9 && !this.completed) { this.completed = true; this.emit('complete', { final: true }); }
+    if (f.t > 9 && !this.completed) { this.completed = true; this.emit('complete', { final: !!this.def.isLast }); }
   }
 }
 

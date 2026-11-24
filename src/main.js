@@ -12,6 +12,8 @@ import { VRPanel } from './ui/vrpanel.js';
 import { VRControls } from './input/vr.js';
 import { DesktopInput } from './input/desktop.js';
 import { loadSave, writeSave, PLAYER } from './config.js';
+import { GunModel } from './render/gun.js';
+import { skyTexture } from './render/textures.js';
 
 const EVENT_SOUNDS = {
   'clone-step': 'clone-step', jump: 'jump', pickup: 'pickup', drop: 'drop', thud: 'thud',
@@ -90,6 +92,9 @@ class App {
     this.camera.add(this.handR.root);
     this.camera.add(this.handL.root);
     this.handAnim = { poke: 0, clone: 0, grabT: 0 };
+    this.gun = new GunModel();
+    this.gun.root.visible = false;
+    this.camera.add(this.gun.root);
 
     // ---------------- Systems
     this.audio = new Audio();
@@ -161,6 +166,7 @@ class App {
       this.handR.root.visible = false;
       this.handL.root.visible = false;
       this.vr.setActive(true);
+      this.gun.root.visible = false;
       this.camera.position.set(0, 0, 0);
       this.camera.rotation.set(0, 0, 0);
       if (this.save.settings.shadows === 'high') { this.sun.shadow.mapSize.set(1024, 1024); if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; } }
@@ -185,6 +191,7 @@ class App {
     this.rig.rotation.set(0, 0, 0);
     this.handR.root.visible = true;
     this.handL.root.visible = true;
+    if (this.gun.root.parent !== this.camera) this.camera.add(this.gun.root);
     this.applySettings();
     if (this.game) this.game.player.headOverride = null;
     if (this.state === 'playing') this.pause();
@@ -263,6 +270,24 @@ class App {
 
   _applyEnv() {
     for (const v of this.view.mirrorViews) { v.glassMat.envMap = this.envMap; v.glassMat.needsUpdate = true; }
+    const sky = !!this.game.def.sky;
+    if (sky) {
+      this.scene.background = skyTexture();
+      this.scene.fog = new THREE.Fog(0xcfdff0, 45, 160);
+      this.hemi.color.setHex(0xdfeeff); this.hemi.groundColor.setHex(0x8a96a6); this.hemi.intensity = 1.5;
+      this.sun.intensity = 2.3;
+      this.sunDir.set(0.45, -1, 0.3).normalize();
+    } else {
+      this.scene.background = new THREE.Color(0x15171a);
+      this.scene.fog = new THREE.Fog(0x2a2c30, 30, 70);
+      this.hemi.color.setHex(0xeef1f5); this.hemi.groundColor.setHex(0x6a6c70); this.hemi.intensity = 1.55;
+      this.sun.intensity = 1.5;
+      this.sunDir.set(0.32, -1, 0.22).normalize();
+    }
+    this.sun.shadow.camera.far = sky ? 90 : 60;
+    this.sun.shadow.camera.updateProjectionMatrix();
+    this.gun.root.visible = !!this.game.hasGun && !this.inXR && !this.backdrop;
+    document.getElementById('ammo').classList.toggle('hidden', !this.game.hasGun);
   }
 
   startLevel(id) {
@@ -370,6 +395,19 @@ class App {
     if (hit && hit.kind === 'mirror' && hit.t <= PLAYER.reach + 0.3) { g.rotateMirror(hit.obj, dir); this.handAnim.poke = 0.3; }
   }
 
+  /** Fire the Kickback gun from the view (desktop) or from a controller (VR). */
+  fireGun(origin, dir) {
+    const g = this.game;
+    if (this.state !== 'playing' || !g || !g.hasGun) return;
+    if (!origin) { const r = this._viewRay(); origin = r.e; dir = r.d; }
+    const hit = g.fire(origin, dir);
+    if (!hit) return;
+    this.gun.fire();
+    const from = this.gun.root.visible || this.gun.root.parent !== this.camera ? this.gun.muzzleWorld() : new THREE.Vector3(origin.x, origin.y - 0.15, origin.z);
+    const to = hit.point ? new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z) : new THREE.Vector3(origin.x + dir.x * 40, origin.y + dir.y * 40, origin.z + dir.z * 40);
+    this.view.addTracer(from, to, hit.kicked);
+  }
+
   doCreateClone() {
     if (this.state !== 'playing') return;
     if (this.game.spawnClone()) { this.handAnim.clone = 0.9; this.handR.flash(); this.handL.flash(); }
@@ -446,6 +484,11 @@ class App {
         this._handleEvents(g.drainEvents());
       }
       this.view.update(dt, { target: this._target });
+      if (g.hasGun) {
+        this.gun.update(dt, g.player.charges);
+        const pips = document.querySelectorAll('#ammo i');
+        pips.forEach((p, i) => p.classList.toggle('on', i < g.player.charges));
+      }
       if (!this.inXR) this._updateDesktopCamera(dt, input);
       this._updatePrompt();
       this._updateShadow();
@@ -474,6 +517,11 @@ class App {
         case 'pickup': this.handAnim.grabT = 0.3; break;
         case 'final-start': this.audio.play('final'); if (!this.inXR) this.menu.hint('All chambers solved. Ascending.', 6); break;
         case 'complete': this._complete(!!e.final); break;
+        case 'shot': this.audio.play(e.kicked ? 'kick' : 'shot'); break;
+        case 'dry': this.audio.play('dry'); break;
+        case 'grip': this.audio.play('grip'); break;
+        case 'checkpoint': this.audio.play('checkpoint'); if (!this.inXR) this.menu.toast('Checkpoint'); break;
+        case 'respawn': this.audio.play('teleport'); this.menu.fade(true); setTimeout(() => this.menu.fade(false), 120); break;
         default: break;
       }
     }
@@ -514,9 +562,15 @@ class App {
     R.root.rotation.set(HP.rx + (holding ? 0.12 : 0) - cl * 0.3, HP.ry + (holding ? 0.06 : 0), HP.rz + (holding ? 0.1 : 0) + cl * 0.9, 'YXZ');
     L.root.position.set(-HP.x + hx + cl * 0.05 + (holding ? 0.03 : 0), HP.y - 0.01 + hb + (holding ? 0.04 : 0) + cl * 0.08, HP.z - 0.02 - (holding ? 0.05 : 0));
     L.root.rotation.set(HP.rx + (holding ? 0.12 : 0) - cl * 0.3, -HP.ry - (holding ? 0.06 : 0), -HP.rz - (holding ? 0.1 : 0) - cl * 0.9, 'YXZ');
+    if (g.hasGun) {
+      // Right hand wraps the gun grip; the gun sits where the hand is.
+      this.gun.root.scale.setScalar(0.72);
+      this.gun.root.position.set(R.root.position.x - 0.035, R.root.position.y + 0.045, R.root.position.z - 0.015);
+      this.gun.root.rotation.set(0.06, 0.07, 0);
+    }
     R.setTarget({
-      curl: holding ? 0.75 : cl > 0.2 ? 0 : targeting || poke > 0.01 ? 0.85 : 0.3,
-      point: holding ? 0 : (targeting || poke > 0.01) && cl < 0.2 ? 1 : 0,
+      curl: g.hasGun ? 0.92 : holding ? 0.75 : cl > 0.2 ? 0 : targeting || poke > 0.01 ? 0.85 : 0.3,
+      point: g.hasGun ? 0.9 : holding ? 0 : (targeting || poke > 0.01) && cl < 0.2 ? 1 : 0,
       spread: cl,
       thumb: holding ? 0.6 : 0.2,
     });

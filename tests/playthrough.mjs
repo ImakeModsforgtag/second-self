@@ -20,6 +20,45 @@ function lead(b, points, { speed = 2.4, near = 1.9, timeout = 10 } = {}) {
   }
 }
 
+
+// ---------------- Kickback gun moves (sky chambers)
+const ready = (b) => b.g.player.cool === 0 && b.g.player.charges > 0;
+/** Gun jump: shoot straight down, then steer with `move` until landed higher up. */
+function gunJump(b, move, minY) {
+  b.hold({ x: 0, z: 0 }, 0.6, () => ready(b) && b.g.player.body.grounded);
+  b.fireDir(b.g.player.yaw, -Math.PI / 2);
+  b.hold(move, 0.25);
+  b.hold(move, 2.5, () => b.g.player.body.grounded);
+  b.wait(0.2);
+  assert(b.p.y > minY - 0.01, `gun jump reached y=${b.p.y.toFixed(2)} (wanted ${minY})`);
+}
+/** Climb a grip wall: walk into it (move), aim down at it (yaw), kick until standing at topY. */
+function climbGrip(b, yaw, move, topY) {
+  for (let k = 0; k < 60; k++) {
+    if (b.g.player.body.grounded && b.p.y > topY - 0.02) break;
+    b.hold(move, 0.8, () => b.g.player.cool === 0 && (b.g.touchingGrip() || b.g.player.body.grounded) && b.g.player.body.vy < 3);
+    if (b.g.player.body.grounded && b.p.y > topY - 0.02) break;
+    try { b.fireDir(yaw, -1.3); } catch (e) { /* no charge yet */ }
+    b.hold(move, 0.05);
+  }
+  b.hold(move, 0.4);
+  assert(b.p.y > topY - 0.02 && b.g.player.body.grounded, `climbed to y=${b.p.y.toFixed(2)} (wanted ${topY})`);
+}
+/** Wall bounce: facing a wall (yaw), jump and shoot it at chest height, steer with move. */
+function bounce(b, yaw, move) {
+  b.g.player.yaw = yaw;
+  b.tick({ x: 0, z: 0 }, true);
+  b.fireDir(yaw, -0.1);
+  b.hold(move, 0.2);
+  b.hold(move, 3, () => b.g.player.body.grounded);
+  b.wait(0.2);
+}
+/** Fire at a point `n` times (waits for the cooldown between shots). */
+function shootAt(b, pt, n = 1) {
+  for (let i = 0; i < n; i++) { b.hold({ x: 0, z: 0 }, 1, () => ready(b)); b.fire(pt); }
+  b.wait(0.2);
+}
+
 const SOLUTIONS = {
   'The First Copy'(b) {
     b.path([[-3, -4.6], [0, -4.6]]);
@@ -474,6 +513,180 @@ const SOLUTIONS = {
     b.path([[-4.5, -11.5], [-8.5, -16.6]]);
     b.waitUntil(() => b.door('D1').t > 0.9, 4, 'D1 open');
     b.path([[-8.5, -18.6], [-8.5, -20.2]]);
+  },
+
+  'Kickback'(b) {
+    const N = { x: 0, z: -3.4 };
+    b.walkTo(0, -2.68);
+    gunJump(b, N, 2.0);
+    b.walkTo(0, -8.5);
+    b.walkTo(0, -12, { jumpAt: (bb) => bb.p.z < -8.55 && bb.g.player.body.grounded });
+    b.wait(0.3);
+    assert(b.p.y > 1.95, 'across the gap');
+    shootAt(b, { x: 6.5, y: 4.5, z: -12 });
+    assert(b.input('T1'), 'bullseye hit');
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'gate open');
+    b.path([[0, -16], [0, -19.68]]);
+    gunJump(b, N, 4.0);
+    b.walkTo(0, -23);
+  },
+
+  'Wall Climber'(b) {
+    const N = { x: 0, z: -3 };
+    b.walkTo(0, -1.72);
+    climbGrip(b, 0, N, 8);
+    b.walkTo(0, -7.6);
+    b.walkTo(0, -12.5, { jumpAt: (bb) => bb.p.z < -7.55 && bb.g.player.body.grounded });
+    b.wait(0.4);
+    assert(b.p.y > 5.95, 'landed on the middle platform');
+    b.path([[1.8, -14], [1.8, -16.72]]);
+    climbGrip(b, 0, N, 10);
+    b.walkTo(0, -21);
+  },
+
+  'Rebound'(b) {
+    b.walkTo(0, 1.72);
+    bounce(b, Math.PI, { x: 0, z: -3.4 });
+    assert(b.p.z < -4 && b.p.y > -0.1, `bounced onto the second platform (z=${b.p.z.toFixed(2)})`);
+    b.walkTo(-2.22, -6.5);
+    bounce(b, Math.PI / 2, { x: 3.4, z: 0 });
+    assert(b.p.x > 3.5 && b.p.y > -0.1, `bounced onto the third platform (x=${b.p.x.toFixed(2)})`);
+    b.walkTo(5.5, -8.72);
+    gunJump(b, { x: 0, z: -3.4 }, 2.0);
+    b.walkTo(5.5, -12.5);
+  },
+
+  'Trick Shots'(b) {
+    b.walkTo(-5, -4);
+    shootAt(b, { x: -5.5, y: 0.75, z: -12 }, 2);
+    b.walkTo(5, -4);
+    shootAt(b, { x: 5.5, y: 0.75, z: -12 }, 2);
+    assert(b.input('R1'), 'beam reaches the receiver via the floating mirrors');
+    b.walkTo(0, 4.5);
+    shootAt(b, { x: 0, y: 6, z: -21.95 });
+    assert(b.input('T1'), 'far bullseye hit over the gate');
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'gate open');
+    b.path([[0, -10], [0, -19.5]]);
+  },
+
+  'Updraft'(b) {
+    b.walkTo(2, 2.3);
+    b.carry('C1', { x: 0, y: 0, z: -3.5 }, { via: [[1, -0.5]] });
+    b.path([[-0.5, 0], [-2, 2.3]]);
+    b.grab('C2');
+    b.holdAim = null; b.holdDist = 1.2; b.carryY = 1.4;
+    b.walkTo(0, -1.5);
+    b.walkTo(0, -3.4, { jumpAt: (bb) => bb.p.z < -1.8 && bb.g.player.body.grounded });
+    b.wait(0.3);
+    assert(b.p.y > 0.95 && b.g.held, 'standing on the crate, still holding the other');
+    b.carryY = 4.6;
+    b.hold({ x: 0, z: 0 }, 0.6, () => ready(b));
+    b.fireDir(0, -Math.PI / 2);
+    b.hold({ x: 0, z: -3.4 }, 0.25);
+    b.hold({ x: 0, z: -3.4 }, 2.5, () => b.g.player.body.grounded);
+    b.wait(0.2);
+    assert(b.p.y > 3.15, `up on the high ledge with the crate (y=${b.p.y.toFixed(2)})`);
+    b.carryY = null;
+    b.walkTo(2, -7.2);
+    b.placeHeld({ x: 2, y: 3.35, z: -9 }, { tol: 0.03 });
+    b.drop();
+    assert(b.input('P1'), 'crate carried up onto the plate');
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'gate open');
+    b.path([[0, -11], [0, -20]]);
+  },
+
+  'Sky Copy'(b) {
+    b.path([[0, -2]]);
+    b.wait(0.2);
+    b.path([[2.5, 0]]);
+    b.walkTo(0, -1.5);
+    b.g.spawnClone();
+    b.waitUntil(() => b.clone().state === 'waiting', 10, 'clone reaches player');
+    lead(b, [[0, -5], [0, -9]], { speed: 1.8 });
+    b.walkTo(0, -13.8, { speed: 3.0, jumpAt: (bb) => bb.p.z < -12.6 && bb.g.player.body.grounded });
+    b.waitUntil(() => b.input('P1'), 10, 'clone in the booth');
+    b.wait(1);
+    b.path([[2.5, -14.1], [3.58, -12]]);
+    climbGrip(b, -Math.PI / 2, { x: 3, z: 0 }, 8);
+    shootAt(b, { x: 13.9, y: 9.5, z: -12 });
+    assert(b.input('T1'), 'hidden bullseye hit from the tower');
+    b.walkTo(2.5, -12);
+    b.wait(1.2);
+    assert(b.input('P1'), 'clone still in the booth');
+    b.path([[2.5, -14.1], [0, -14.1]]);
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'gate open');
+    b.path([[0, -18], [0, -22]]);
+  },
+
+  'Crosswind'(b) {
+    b.walkTo(0, 1.72);
+    bounce(b, Math.PI, { x: 0, z: -3.4 });
+    assert(b.p.z < -4.4 && b.p.y > -0.1, `bounced onto the long platform (z=${b.p.z.toFixed(2)})`);
+    b.walkTo(1.5, -6.5);
+    shootAt(b, { x: -6, y: 0.75, z: -5 }, 2);
+    b.walkTo(1.5, -10);
+    shootAt(b, { x: -6, y: 0.75, z: -13 }, 2);
+    assert(b.input('R1'), 'main beam home');
+    b.walkTo(-1, -6.5);
+    shootAt(b, { x: 5, y: 0.75, z: -9.5 }, 1);
+    assert(!b.input('RL'), 'lock beam turned aside');
+    b.walkTo(0, -13.78);
+    climbGrip(b, 0, { x: 0, z: -3 }, 7);
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'gate open');
+    b.path([[0, -16], [0, -19.5]]);
+  },
+
+  'The Summit'(b) {
+    // Crates over to B first
+    b.walkTo(3, 1.3);
+    b.carry('C1', { x: -3, y: 0, z: -16.1 }, { via: [[0, -3], [0, -11], [-3, -13]] });
+    b.path([[-1.5, -13], [0, -11], [0, -3], [-3, 0.3]]);
+    b.carry('C2', { x: -4.6, y: 0, z: -13.2 }, { via: [[0, -3], [0, -11], [-2.5, -12.5]] });
+    // Floating mirror near B
+    b.path([[2, -12.8], [4, -14]]);
+    shootAt(b, { x: 9.5, y: 0.75, z: -12.6 }, 2);
+    // Clone into the booth
+    b.path([[2, -12.8], [0, -11], [0, -4], [0, -1.5]]);
+    b.g.spawnClone();
+    b.waitUntil(() => b.clone().state === 'waiting', 10, 'clone reaches player');
+    lead(b, [[0, -5], [0, -9], [0, -12.4]], { speed: 1.8 });
+    b.walkTo(0, -16.3, { speed: 3.0, jumpAt: (bb) => bb.p.z < -15.1 && bb.g.player.body.grounded });
+    b.waitUntil(() => b.input('P1'), 10, 'clone in the booth');
+    b.wait(1);
+    // Updraft with the second crate
+    b.path([[-2, -16.2], [-4.6, -14.5]]);
+    b.grab('C2');
+    b.holdAim = null; b.holdDist = 1.2; b.carryY = 1.4;
+    b.walkTo(-3, -14.6);
+    b.walkTo(-3, -16.0, { jumpAt: (bb) => bb.p.z < -14.9 && bb.g.player.body.grounded });
+    b.wait(0.3);
+    assert(b.p.y > 0.95 && b.g.held, 'on the crate holding the other');
+    b.carryY = 4.6;
+    b.hold({ x: 0, z: 0 }, 0.6, () => ready(b));
+    b.fireDir(0, -Math.PI / 2);
+    b.hold({ x: 0, z: -3.4 }, 0.25);
+    b.hold({ x: 0, z: -3.4 }, 2.5, () => b.g.player.body.grounded);
+    b.wait(0.2);
+    assert(b.p.y > 3.15, `up on the shelf (y=${b.p.y.toFixed(2)})`);
+    b.carryY = null;
+    b.walkTo(-3.2, -21.8);
+    b.placeHeld({ x: -4.5, y: 3.35, z: -23.5 }, { tol: 0.03 });
+    b.drop();
+    assert(!b.input('RL'), 'lock blocked with the carried crate');
+    // Second floating mirror from the shelf
+    b.walkTo(5, -20);
+    shootAt(b, { x: 9.5, y: 0.75, z: -36 }, 2);
+    b.wait(0.3);
+    assert(b.input('R1'), 'main beam home');
+    // Climb the summit tower and shoot the last bullseye
+    b.walkTo(0, -23.74);
+    climbGrip(b, 0, { x: 0, z: -3 }, 10);
+    b.walkTo(2, -26.5);
+    shootAt(b, { x: 13.9, y: 12.5, z: -30 });
+    assert(b.input('T1'), 'summit bullseye hit');
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'final gate open');
+    b.path([[0, -27.5], [0, -32]]);
+    b.waitUntil(() => b.g.finalSeq, 2, 'final ascent starts');
   },
 };
 
