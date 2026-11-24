@@ -6,7 +6,7 @@
 import { LEVELS } from '../src/levels/levels.js';
 import { Bot, assert } from './bot.mjs';
 
-const only = process.argv[2] ? Number(process.argv[2]) : null;
+const only = process.argv[2] && !process.argv[2].startsWith('-') ? Number(process.argv[2]) : null;
 const verbose = process.argv.includes('-v');
 
 /** Walk to each point, then wait for the clone to catch up (it follows while it can see us). */
@@ -21,7 +21,7 @@ function lead(b, points, { speed = 2.4, near = 1.9, timeout = 10 } = {}) {
 }
 
 const SOLUTIONS = {
-  1(b) {
+  'The First Copy'(b) {
     b.path([[-3, -4.6], [0, -4.6]]);
     b.g.spawnClone();                       // press F
     b.waitUntil(() => b.input('P1'), 14, 'clone on plate P1');
@@ -33,7 +33,7 @@ const SOLUTIONS = {
     b.walkTo(3, -9.2);
   },
 
-  2(b) {
+  'Out of Sight'(b) {
     // Stage 1: lead the clone around two corners to the low wall.
     b.walkTo(-4, 3.2);
     b.g.spawnClone();
@@ -61,7 +61,7 @@ const SOLUTIONS = {
     b.path([[6, -19], [13, -19.5], [13, -23.5], [13, -24.5]]);
   },
 
-  3(b) {
+  'Weight and Height'(b) {
     const grounded = (bb) => bb.g.player.body.grounded;
     b.walkTo(-1.8, -1);
     b.carry('B1', { x: 3, y: 0, z: -3 });
@@ -104,7 +104,7 @@ const SOLUTIONS = {
     b.path([[6, -22.6], [6, -23.6]]);
   },
 
-  4(b) {
+  'Refraction'(b) {
     b.walkTo(0.6, -1.0);
     b.rotateMirrorTo('M1', 2);
     b.walkTo(2.0, -6.6);
@@ -119,7 +119,7 @@ const SOLUTIONS = {
     b.path([[4.5, -13], [4.5, -14.5]]);
   },
 
-  5(b) {
+  'The Split Path'(b) {
     // East emitter: around the dividing wall with three fixed mirrors.
     b.path([[1.2, -3], [1.2, -8.8]]);
     b.rotateMirrorTo('M2', 2);
@@ -148,7 +148,7 @@ const SOLUTIONS = {
     b.path([[1.2, -3], [1.2, -12.6], [0, -13.4], [0, -16.5]]);
   },
 
-  6(b) {
+  'Two of You'(b) {
     const grounded = (bb) => bb.g.player.body.grounded;
     // Chamber A: clone on the plate behind the partition powers the emitter.
     b.walkTo(-2.5, 1.5);
@@ -193,7 +193,7 @@ const SOLUTIONS = {
     b.path([[6, -23], [6, -26.5]]);
   },
 
-  7(b) {
+  'Build Your Way Out'(b) {
     const grounded = (bb) => bb.g.player.body.grounded;
     // ---- Chamber A
     b.walkTo(5.4, 0.6);
@@ -265,7 +265,7 @@ const SOLUTIONS = {
     b.path([[-7, -25.2], [-7, -28.5]]);
   },
 
-  8(b) {
+  'The Final Experiment'(b) {
     const grounded = (bb) => bb.g.player.body.grounded;
     const climb = (x0, z0, x1, z1, jumpWhen) => { b.walkTo(x0, z0); b.walkTo(x1, z1, { jumpAt: (bb) => jumpWhen(bb) && grounded(bb) }); b.wait(0.3); };
 
@@ -376,12 +376,111 @@ const SOLUTIONS = {
     b.path([[-2, -69], [-2, -70.2]]);
     b.waitUntil(() => b.g.finalSeq, 2, 'final lift starts');
   },
+  'Countdown'(b) {
+    const grounded = (bb) => bb.g.player.body.grounded;
+    b.walkTo(-4, -2.8);
+    b.rotateMirrorTo('M1', 14);
+    b.walkTo(-2.8, -10.2);
+    b.rotateMirrorTo('M2', 2);
+    b.wait(0.2);
+    assert(b.input('R1'), 'R1 lit');
+    b.path([[0, -1], [1.7, 0]]);
+    b.carry('C1', { x: -7.0, y: 0, z: -2 }, { via: [[-3, -1]] });
+    b.walkTo(-5.2, -2);
+    b.walkTo(-7.0, -2, { jumpAt: (bb) => bb.p.x < -6.15 && grounded(bb) });
+    b.wait(0.3);
+    assert(b.p.y > 0.95, 'on the crate');
+    const t0 = b.g.time;
+    b.interact({ x: -7.75, y: 3.4, z: -2 });
+    assert(b.input('B1'), 'timed switch on');
+    b.path([[-5.4, -2], [-2, -2], [3, -5], [5, -14.6], [5, -16.6]], { speed: 3.4 });
+    b.walkTo(5, -18.5);
+    b.note(`reached the exit ${(b.g.time - t0).toFixed(1)} s after pressing the switch`);
+    assert(b.g.time - t0 < 12, 'made it before the switch timed out');
+  },
+
+  'Stand-In'(b) {
+    b.walkTo(-4.2, -1);
+    b.carry('C1', { x: -4, y: 0, z: -12 }, { via: [[-3.5, -5]] });
+    assert(b.input('P1'), 'crate on plate');
+    b.path([[-3, -6], [-2.7, 1]]);
+    b.carry('PM1', { x: 5, y: 0, z: -10 }, { via: [[2, -3], [5, -6.5]] });
+    b.walkTo(5, -8.6);
+    b.rotateMirrorTo('PM1', 14);
+    b.wait(0.2);
+    assert(b.input('R1'), 'R1 lit');
+    assert(b.input('RL'), 'lock still lit');
+    b.path([[3, -4.5], [2, -7.8], [0, -7.8]]);
+    b.g.spawnClone();
+    b.waitUntil(() => !b.input('RL'), 14, 'clone walks into the booth and blocks the lock beam');
+    b.wait(1.0);
+    assert(!b.input('RL'), 'lock stays dark');
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'D1 open');
+    b.path([[0, -13], [0, -16.5]]);
+  },
+
+  'Elevation'(b) {
+    const grounded = (bb) => bb.g.player.body.grounded;
+    b.walkTo(0.7, 0);
+    b.carry('C1', { x: 4, y: 0, z: -8 }, { via: [[3, -4]] });
+    b.path([[1, -3], [-0.7, 0]]);
+    b.carry('C2', { x: 4, y: 1, z: -8 }, { via: [[2, -4.5]] });
+    const c2 = b.g.blocks.find((k) => k.id === 'C2');
+    assert(Math.abs(c2.pos.y - 1) < 0.02, 'crates stacked');
+    b.path([[1, -4], [-1.3, -2]]);
+    b.carry('PM1', { x: 4, y: 2, z: -8 }, { via: [[3, -5]] });
+    const pm = b.g.mirrors[0];
+    assert(Math.abs(pm.body.pos.y - 2) < 0.02, 'mirror on top of the tower');
+    b.walkTo(4, -6.6);
+    b.rotateMirrorTo('PM1', 2);
+    b.wait(0.2);
+    assert(b.input('R1'), 'R1 lit by the raised mirror');
+    b.path([[6.5, -5], [6.5, -1.6], [5, -1.6]]);
+    b.carry('S1', { x: -4, y: 0, z: -12.5 }, { via: [[0, -5], [-4, -9]] });
+    b.walkTo(-4.5, -10.9);
+    b.walkTo(-4.5, -12.5, { jumpAt: (bb) => bb.p.z < -11.5 && grounded(bb) });
+    b.wait(0.3);
+    b.walkTo(-4.5, -14.2, { jumpAt: grounded });
+    b.wait(0.3);
+    assert(b.p.y > 1.95, 'on the north ledge');
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'D1 open');
+    b.path([[-4, -15.6], [-4, -18.5]]);
+  },
+
+  'Mirror Image'(b) {
+    b.path([[0, -3], [0, -7.5], [2, -10.4]]);
+    b.carry('C1', { x: 7.2, y: 2, z: -16.5 }, { via: [[4, -14], [5.4, -16.5]], standOff: 1.8 });
+    assert(b.input('P2'), 'crate on the shelf plate');
+    b.path([[4.3, -11], [4.3, -8]]);
+    b.carry('PM1', { x: -3, y: 0, z: -13 }, { via: [[0, -10]] });
+    const pm = b.g.mirrors.find((m) => m.id === 'PM1');
+    assert(Math.abs(pm.body.pos.x + 3) < 0.01, 'mirror in the socket on the lock beam');
+    b.walkTo(-1.8, -12.2);
+    b.rotateMirrorTo('PM1', 0);
+    b.wait(0.2);
+    assert(!b.input('RL'), 'mirror turns the lock beam away');
+    b.walkTo(-4.8, -10.8);
+    b.rotateMirrorTo('M1', 14);
+    b.path([[0, -8], [0, -3], [-6, 2.0]]);
+    b.g.spawnClone();
+    b.waitUntil(() => b.clone().state === 'waiting', 10, 'clone reaches player');
+    lead(b, [[-1, 1.0], [0, -1.5]]);
+    b.walkTo(0, -6.0, { speed: 2.0 });
+    b.waitUntil(() => b.input('P1') && b.clone().state === 'waiting', 8, 'clone on P1');
+    b.path([[0, -6.75], [-1.4, -6.95]], { speed: 3.4 });
+    b.wait(1.2);
+    assert(b.input('P1'), 'clone frozen on P1');
+    assert(b.input('R1'), 'R1 lit while the clone powers the emitter');
+    b.path([[-4.5, -11.5], [-8.5, -16.6]]);
+    b.waitUntil(() => b.door('D1').t > 0.9, 4, 'D1 open');
+    b.path([[-8.5, -18.6], [-8.5, -20.2]]);
+  },
 };
 
 let failures = 0;
 for (const level of LEVELS) {
   if (only && level.id !== only) continue;
-  const sol = SOLUTIONS[level.id];
+  const sol = SOLUTIONS[level.name];
   if (!sol) { console.log(`Level ${level.id} ${level.name}: NO SOLUTION SCRIPT`); failures++; continue; }
   const b = new Bot(level, { verbose });
   const t0 = Date.now();

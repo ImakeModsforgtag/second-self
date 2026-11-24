@@ -6,7 +6,7 @@
 // toward +z. Useful values: 2 or 10 = "/" diagonal, 6 or 14 = "\" diagonal,
 // 0 or 8 = faces east/west, 4 or 12 = faces north/south (beams along x pass by).
 
-export const LEVELS = [
+const RAW_LEVELS = [
   // ===================================================================== 1
   {
     id: 1,
@@ -285,6 +285,87 @@ export const LEVELS = [
     },
   },
 
+  // ===================================================================== Countdown
+  {
+    id: 0,
+    name: 'Countdown',
+    difficulty: 'Hard',
+    blurb: 'Some switches only hold for a few seconds. Plan the run before you press.',
+    bounds: [-8.2, -20.2, 8.2, 4.2],
+    height: 5,
+    start: { x: 0, z: 2.6, yaw: 0 },
+    build(b) {
+      b.wallX(4, -8, 8);
+      b.wallZ(-8, -16, 4);
+      b.wallZ(8, -16, 4);
+      b.wallX(-16, -8, 8, { gaps: [[4, 6]] });
+      // Timed switch, high on the west wall: needs something to stand on.
+      b.button({ id: 'B1', x: -7.75, y: 3.4, z: -2, facing: 'E', mode: 'timed', duration: 12 });
+      b.cube(3, 0, 0, 1, 'C1');
+      // Beam that must reach the east wall
+      b.emitter({ id: 'E1', x: 7.5, z: -4, dir: 'W' });
+      b.mirror({ id: 'M1', x: -4, z: -4, step: 0 });
+      b.mirror({ id: 'M2', x: -4, z: -10, step: 4 });
+      b.receiver({ id: 'R1', x: 7.62, z: -10, facing: 'W' });
+      b.pillar(0.5, -8, 1.5, -6);
+      b.door({ id: 'D1', x: 5, z: -16, axis: 'x', width: 2, requires: ['B1', 'R1'] });
+      b.wallZ(4, -20, -16);
+      b.wallZ(6, -20, -16);
+      b.wallX(-20, 4, 6);
+      b.exit({ x: 5, z: -18.5 });
+
+      b.light(-4, 1); b.light(4, 1); b.light(-4, -6); b.light(4, -6); b.light(-4, -12); b.light(4, -12); b.light(5, -18.5);
+
+      b.hint('A timed switch stays on for only a few seconds. Get everything else ready first.');
+      b.hint('Point the beam at the receiver on the east wall before you go for the switch.', [-6, -12, -2, -2]);
+      b.hint('The switch is out of reach. You know what to do about that.', [-8, -4, -4, 0]);
+    },
+  },
+
+  // ===================================================================== Stand-In
+  {
+    id: 0,
+    name: 'Stand-In',
+    difficulty: 'Hard',
+    blurb: 'One crate, two jobs. Your copy can take the other one.',
+    bounds: [-8.2, -18.2, 8.2, 4.2],
+    height: 5,
+    start: { x: 3, z: 2.6, yaw: 0 },
+    build(b) {
+      b.wallX(4, -8, 8);
+      b.wallZ(-8, -14, 4);
+      b.wallZ(8, -14, 4);
+      b.wallX(-14, -8, 8, { gaps: [[-1, 1]] });
+      b.pod({ x: 0, z: 2.5, yaw: 0 });
+      // Lock beam straight across the room, through a shallow booth.
+      b.emitter({ id: 'E1', x: -7.5, z: -6.15, dir: 'E' });
+      b.receiver({ id: 'RL', x: 7.62, z: -6.15, facing: 'W', lock: true });
+      b.barrier(-1.2, -6.9, 1.2, -6.6, 0.9);
+      b.barrier(-1.2, -6.6, -0.9, -5.7, 0.6);
+      b.barrier(0.9, -6.6, 1.2, -5.7, 0.6);
+      // A beam to bend with the portable mirror
+      b.emitter({ id: 'E2', x: 5, z: 3.5, dir: 'N' });
+      b.receiver({ id: 'R1', x: -7.62, z: -10, facing: 'E' });
+      b.mirror({ id: 'PM1', x: -4, z: 1, step: 0, portable: true });
+      b.socket({ x: -4, z: 1 });
+      b.socket({ x: 5, z: -10 });
+      b.socket({ x: 5, z: -2 });
+      b.socket({ x: -3, z: -10 });
+      b.plate({ id: 'P1', x: -4, z: -12 });
+      b.cube(-5.5, -1, 0, 1, 'C1');
+      b.door({ id: 'D1', x: 0, z: -14, axis: 'x', width: 2, requires: ['P1', 'R1', '!RL'] });
+      b.wallZ(-1, -18, -14);
+      b.wallZ(1, -18, -14);
+      b.wallX(-18, -1, 1);
+      b.exit({ x: 0, z: -16.5 });
+
+      b.light(-4, 1); b.light(4, 1); b.light(-4, -6); b.light(4, -6); b.light(-4, -11); b.light(4, -11); b.light(0, -16.5);
+
+      b.hint('Three demands, one crate. Remember: your clone is solid too.');
+      b.hint('The lock beam runs straight through that little booth.', [-3, -9, 3, -4]);
+    },
+  },
+
   // ===================================================================== 7
   {
     id: 7,
@@ -359,6 +440,84 @@ export const LEVELS = [
       b.hint('Chamber A: the emitter on the ledge needs someone on the plate. The exit door needs the beam to keep shining.');
       b.hint('Mirrors on pillars can be turned from the floor.', [-6, -5, 8, -3.5]);
       b.hint('Chamber B: a lock, a portable mirror, a booth, and a landing out of reach. Plan before you lift.', [5, -16, 10, -13.8]);
+    },
+  },
+
+  // ===================================================================== Elevation
+  {
+    id: 0,
+    name: 'Elevation',
+    difficulty: 'Very hard',
+    blurb: 'The beam runs high. Meet it halfway.',
+    bounds: [-8.2, -20.2, 8.2, 4.2],
+    height: 7,
+    start: { x: 0, z: 2.6, yaw: 0 },
+    build(b) {
+      b.wallX(4, -8, 8);
+      b.wallZ(-8, -16, 4);
+      b.wallZ(8, -16, 4);
+      b.wallX(-16, -8, 8, { gaps: [[-5, -3]] });
+      b.platform(-8, -10, -6, -6, 2.0);            // emitter ledge
+      b.platform(-8, -16, 8, -13, 2.0);            // north ledge with the exit door
+      b.emitter({ id: 'E1', x: -7.3, z: -8, y: 2, dir: 'E' });
+      b.receiver({ id: 'R1', x: 4, z: -15.62, y: 2, facing: 'S' });
+      b.mirror({ id: 'PM1', x: 0, z: -2, step: 0, portable: true });
+      b.cube(2, 0, 0, 1, 'C1');
+      b.cube(-2, 0, 0, 1, 'C2');
+      b.slab(5, -3, 2, 1, 1, 0, 'S1');
+      b.door({ id: 'D1', x: -4, z: -16, axis: 'x', width: 2, y0: 2.0, requires: ['R1'] });
+      b.platform(-5, -20, -3, -16, 2.0);
+      b.wallZ(-5, -20, -16);
+      b.wallZ(-3, -20, -16);
+      b.wallX(-20, -5, -3);
+      b.exit({ x: -4, z: -18.5, y: 2.0 });
+
+      b.light(-4, 1, 6.95); b.light(4, 1, 6.95); b.light(-4, -7, 6.95); b.light(4, -7, 6.95); b.light(0, -14.5, 6.95); b.light(-4, -18.5, 6.95);
+
+      b.hint('That beam passes far above the floor. A mirror on the floor will never catch it.');
+      b.hint('Mirrors can sit on top of crates.', [-2, -6, 6, -1]);
+    },
+  },
+
+  // ===================================================================== Mirror Image
+  {
+    id: 0,
+    name: 'Mirror Image',
+    difficulty: 'Very hard',
+    blurb: 'A mirror can stop a beam too. Your copy is watching the doorway.',
+    bounds: [-10.2, -22.2, 10.2, 4.2],
+    height: 5,
+    start: { x: 4, z: 2.5, yaw: 0 },
+    build(b) {
+      b.wallX(4, -10, 10);
+      b.wallZ(-10, -18, 4);
+      b.wallZ(10, -18, 4);
+      b.wallX(-6, -10, 10, { gaps: [[-0.6, 0.6]] });
+      b.wallX(-18, -10, 10, { gaps: [[-9.5, -7.5]] });
+      b.pod({ x: -8, z: 2.5, yaw: -90 });
+      b.plate({ id: 'P1', x: 0, z: -4.85, w: 1.8, d: 1.8 });
+      b.emitter({ id: 'E1', x: 9.5, z: -10, dir: 'W', power: ['P1'] });
+      b.mirror({ id: 'M1', x: -6, z: -10, step: 0 });
+      b.receiver({ id: 'R1', x: -6, z: -17.62, facing: 'S' });
+      b.emitter({ id: 'E2', x: -9.5, z: -13, dir: 'E' });
+      b.receiver({ id: 'RL', x: 9.62, z: -13, facing: 'W', lock: true });
+      b.platform(6, -18, 10, -15, 2.0);
+      b.plate({ id: 'P2', x: 7.2, z: -16.5, y: 2.0, w: 1.6, d: 1.6 });
+      b.mirror({ id: 'PM1', x: 3, z: -8, step: 4, portable: true });
+      b.socket({ x: -3, z: -13 });
+      b.socket({ x: 3, z: -8 });
+      b.socket({ x: 2, z: -11 });
+      b.cube(2, -11.8, 0, 1, 'C1');
+      b.door({ id: 'D1', x: -8.5, z: -18, axis: 'x', width: 2, requires: ['R1', 'P2', '!RL'] });
+      b.wallZ(-9.5, -22, -18);
+      b.wallZ(-7.5, -22, -18);
+      b.wallX(-22, -9.5, -7.5);
+      b.exit({ x: -8.5, z: -20.2 });
+
+      b.light(-6, 0); b.light(6, 0); b.light(-6, -10); b.light(6, -10); b.light(-5, -15); b.light(5, -15); b.light(-8.5, -20.2);
+
+      b.hint('One crate and a shelf plate. The lock will need something else.');
+      b.hint('Whatever your clone can see through that doorway, it will walk toward.', [-3, -9, 3, -6.5]);
     },
   },
 
@@ -473,3 +632,6 @@ export const LEVELS = [
     },
   },
 ];
+
+// Chamber numbers follow the order above.
+export const LEVELS = RAW_LEVELS.map((lv, i) => ({ ...lv, id: i + 1 }));

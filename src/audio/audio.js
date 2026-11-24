@@ -202,6 +202,9 @@ export class Audio {
         [130.8, 196, 261.6, 329.6, 392, 523.3].forEach((f, i) => this._tone(out, { f0: f, dur: 7, t: i * 0.25, a: 2, vol: 0.06 }));
         this._noise(out, { dur: 6, type: 'bandpass', f: 300, f1: 6000, q: 0.5, a: 3, vol: 0.06 });
         break;
+      case 'tick':
+        this._tone(out, { type: 'square', f0: (opts.left || 5) <= 3 ? 1400 : 1000, dur: 0.04, vol: 0.05 });
+        break;
       case 'toast':
         this._tone(out, { type: 'triangle', f0: 520, f1: 420, dur: 0.12, vol: 0.05 });
         break;

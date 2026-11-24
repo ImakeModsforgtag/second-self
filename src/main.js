@@ -465,6 +465,7 @@ class App {
       const snd = EVENT_SOUNDS[e.type];
       const pos = e.x !== undefined ? { x: e.x, y: e.y, z: e.z } : null;
       if (snd) this.audio.play(snd, pos, { speed: e.speed });
+      if (e.type === 'tick') this.audio.play('tick', pos, { left: e.left });
       switch (e.type) {
         case 'step': this.audio.play('step', null, { gain: 0.8 }); break;
         case 'land': this.audio.play('land'); break;

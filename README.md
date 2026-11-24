@@ -1,7 +1,7 @@
 # SECOND SELF
 
 A minimalist first-person puzzle game for VR (WebXR, Meta Quest) and desktop.
-You solve eight concrete test chambers with three tools: a copy of yourself,
+You solve twelve concrete test chambers with three tools: a copy of yourself,
 mirrors that bend laser beams, and crates you can lift and stack.
 
 Built with Three.js, WebXR and Vite. Everything (textures, models, hands, sound)
@@ -34,7 +34,7 @@ npm run build
 npm run preview
 ```
 
-* `npm test` runs the mechanics checks and the automated playthrough that solves all 8 levels.
+* `npm test` runs the mechanics checks and the automated playthrough that solves all 12 levels.
 * `npm run build` makes the production files in `dist`.
 * `npm run preview` serves the production build at http://localhost:4173.
 
@@ -166,11 +166,15 @@ others need their conditions held. Doors will not close on you.
 | 4 | Refraction | Medium | Emitters, rotatable mirrors, receivers |
 | 5 | The Split Path | Medium to hard | Three emitters, a lock receiver, a portable mirror on sockets, blocking a beam |
 | 6 | Two of You | Hard | A clone-powered emitter, aiming mirrors out of the clone's sight, a door needing a plate and a receiver, the clone blocking a beam |
-| 7 | Build Your Way Out | Very hard | Two chambers combining every mechanic, with an order that matters |
-| 8 | The Final Experiment | Extremely hard | Four chambers and a stair corridor, all mechanics together, ending in the lift |
+| 7 | Countdown | Hard | Timed switches: press, then race to the door before it shuts |
+| 8 | Stand-In | Hard | One crate, two jobs: your clone becomes the beam blocker |
+| 9 | Build Your Way Out | Very hard | Two chambers combining every mechanic, with an order that matters |
+| 10 | Elevation | Very hard | Stacking crates to lift a mirror into a high beam, plus a climb |
+| 11 | Mirror Image | Very hard | A mirror used as a blocker, a shelf plate, and a clone watching a doorway |
+| 12 | The Final Experiment | Extremely hard | Four chambers and a stair corridor, all mechanics together, ending in the lift |
 
 Every level is hand built and has a verified solution: `tests/playthrough.mjs`
-solves all eight using only player actions (walk, jump, look, grab, interact,
+solves all twelve using only player actions (walk, jump, look, grab, interact,
 create clone). The clone is moved only by its own AI.
 
 ---
@@ -186,7 +190,7 @@ src/sim/                pure game logic (runs in the browser and in Node tests)
   clone.js              clone AI (field of view, line of sight, walking)
   laser.js              beam tracing and mirror reflection
   game.js               plates, buttons, doors, receivers, pods, exits, hints
-src/levels/             level builder and the eight chambers
+src/levels/             level builder and the twelve chambers
 src/render/             view (scene building), procedural textures, hands, clone model
 src/input/              desktop (keyboard/mouse) and VR controllers
 src/ui/                 HTML menus and the in-headset VR panel

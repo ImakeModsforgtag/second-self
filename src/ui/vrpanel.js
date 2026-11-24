@@ -59,8 +59,8 @@ export class VRPanel {
     const cx = W / 2 - 210;
     if (this.page === 'main' || this.page === 'levels') {
       LEVELS.forEach((lv, i) => {
-        const col = i % 2, row = Math.floor(i / 2);
-        add(`${lv.id}. ${lv.name}`, 'level:' + lv.id, 70 + col * 450, 170 + row * 86, 430, 70, lv.id <= app.save.unlocked);
+        const col = i % 3, row = Math.floor(i / 3);
+        add(`${lv.id}. ${lv.name}`, 'level:' + lv.id, 40 + col * 318, 160 + row * 84, 302, 70, lv.id <= app.save.unlocked);
       });
       add(`Movement: ${app.save.settings.vrMovement === 'smooth' ? 'Smooth + teleport' : 'Teleport only'}`, 'toggle-move', 70, 530, 430, 64);
       add('Exit VR', 'exit-vr', 520, 530, 430, 64);
@@ -108,7 +108,7 @@ export class VRPanel {
       roundRect(c, bt.x, bt.y, bt.w, bt.h, 10); c.fill();
       c.strokeStyle = i === this.hover ? '#8cbcff' : '#4a4d52'; c.lineWidth = 2; c.stroke();
       c.fillStyle = bt.enabled ? '#e6e7e9' : '#666a70';
-      c.font = '28px system-ui, sans-serif';
+      c.font = bt.w < 320 ? '24px system-ui, sans-serif' : '28px system-ui, sans-serif';
       c.textAlign = 'center';
       c.fillText(bt.label, bt.x + bt.w / 2, bt.y + bt.h / 2 + 10);
     });

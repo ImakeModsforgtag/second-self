@@ -616,7 +616,12 @@ export class View {
       this._setPlaque(v.plaque, v.p.pressed);
     }
     for (const v of this.buttonViews) {
-      v.capMat.emissiveIntensity = v.b.on ? 1.6 : 0.2;
+      let glow = v.b.on ? 1.6 : 0.2;
+      if (v.b.on && v.b.mode !== 'toggle') {
+        const rate = v.b.t < 4 ? 8 : 3;
+        glow = 0.6 + (Math.sin(t * rate * Math.PI) > 0 ? 1.4 : 0);
+      }
+      v.capMat.emissiveIntensity = glow;
       v.cap.position.z = v.b.on ? 0.035 : 0.05;
       this._setPlaque(v.plaque, v.b.on);
     }

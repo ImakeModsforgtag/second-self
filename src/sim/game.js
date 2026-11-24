@@ -506,7 +506,9 @@ export class Game {
     // Buttons
     for (const b of this.buttons) {
       if (b.mode !== 'toggle' && b.on) {
+        const before = Math.ceil(b.t);
         b.t -= dt;
+        if (Math.ceil(b.t) !== before && b.t > 0) this.emit('tick', { x: b.x, y: b.y, z: b.z, left: Math.ceil(b.t) });
         if (b.t <= 0) { b.on = false; this.emit('button-off', { id: b.id, x: b.x, y: b.y, z: b.z }); }
       }
       this.inputs.set(b.id, b.on);
