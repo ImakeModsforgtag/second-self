@@ -19,6 +19,22 @@
     <div id="hint"></div>
     <div id="levelTag"></div>
     <div id="toast"></div>
+    <div id="chatlog"></div>
+    <div id="playerlist"></div>
+  </div>
+  <input id="chatinput" class="hidden" maxlength="200" placeholder="Type a message, Enter to send, Esc to cancel" autocomplete="off" />
+  <div id="netbanner"></div>
+  <div id="netpause" class="hidden">
+    <div class="panel small">
+      <h3>Teammate disconnected</h3>
+      <p id="netpause-text" class="sub"></p>
+      <div class="hostonly">
+        <button data-host="continue" class="primary">Continue without them</button>
+        <button data-host="restart">Restart for the players here</button>
+        <button data-host="lobby">Back to the lobby</button>
+      </div>
+      <p class="note guestonly">The host can continue, restart, or return everyone to the lobby.</p>
+    </div>
   </div>
 
   <div id="fade"></div>
@@ -31,6 +47,7 @@
         <p class="sub">A test facility. A copy of you. A way out.</p>
         <button data-action="play" class="primary">Play</button>
         <button data-action="levels">Level Select</button>
+        <button data-action="mp">Co-op Multiplayer</button>
         <button data-action="settings">Settings</button>
         <button data-action="enter-vr" id="btn-vr" class="vr">Enter VR</button>
         <p class="note" id="vr-note"></p>
@@ -87,6 +104,87 @@
         <p id="final-stats" class="sub"></p>
         <button data-action="main" class="primary">Main Menu</button>
         <button data-action="levels">Level Select</button>
+      </div>
+    </section>
+
+    <!-- Co-op multiplayer -->
+    <section id="screen-mp" class="screen hidden">
+      <div class="panel">
+        <h2>Co-op Multiplayer</h2>
+        <p class="sub">2 to 4 players, online. Every chamber rebuilds itself for the size of your team.</p>
+        <div class="row"><label for="mp-name">Username</label><input id="mp-name" maxlength="16" autocomplete="off" /></div>
+        <button data-action="mp-create" class="primary">Create Lobby</button>
+        <div class="joinrow"><input id="mp-code" maxlength="6" placeholder="LOBBY CODE" autocomplete="off" spellcheck="false" /><button data-action="mp-join">Join Lobby</button></div>
+        <button data-action="mp-outfit">Outfit Customization</button>
+        <button data-action="back">Back</button>
+        <p class="note" id="mp-status"></p>
+      </div>
+    </section>
+
+    <section id="screen-lobby" class="screen hidden">
+      <div class="panel wide">
+        <div class="lobbyhead">
+          <div><span class="note">LOBBY CODE</span><div id="lobby-code" class="code">------</div></div>
+          <button data-action="mp-copy" class="mini2">Copy code</button>
+        </div>
+        <div class="lobbycols">
+          <div><h3>Players <span id="lobby-count" class="note"></span></h3><div id="lobby-players"></div></div>
+          <div><h3>Vote for a chamber</h3><div id="lobby-levels"></div></div>
+        </div>
+        <div class="chatbox"><div class="chatlog" id="lobby-chatlog"></div><input id="lobby-chatin" placeholder="Chat with your team (Enter to send)" maxlength="200" autocomplete="off" /></div>
+        <div class="btnrow">
+          <button data-action="mp-ready" id="btn-ready" class="primary">Ready</button>
+          <button data-action="mp-start" id="btn-start" class="primary">Start</button>
+          <button data-action="mp-voice" id="btn-voice">Voice: off</button>
+          <button data-action="mp-outfit">Outfit</button>
+          <button data-action="mp-leave">Leave Lobby</button>
+        </div>
+        <p class="note" id="lobby-status"></p>
+        <p class="keys">In game: T chat &middot; 1 to 7 quick chat &middot; Tab team list &middot; V mute mic &middot; Esc team menu</p>
+      </div>
+    </section>
+
+    <section id="screen-outfit" class="screen hidden">
+      <div class="panel wide">
+        <h2>Outfit Customization</h2>
+        <div class="outfitcols"><canvas id="outfit-canvas" width="300" height="400"></canvas><div id="outfit-form"></div></div>
+        <h3>Presets</h3>
+        <div id="outfit-presets"></div>
+        <button data-action="mp-outfit-done" class="primary">Done</button>
+      </div>
+    </section>
+
+    <section id="screen-mppause" class="screen hidden">
+      <div class="panel">
+        <h2>Team Menu</h2>
+        <p class="sub">The chamber keeps running for your team.</p>
+        <div id="mppause-players" class="teamlist"></div>
+        <button data-action="resume" class="primary">Back to the chamber</button>
+        <h3>Quick chat</h3>
+        <div id="mppause-quick" class="quickgrid"></div>
+        <button data-action="mp-voice">Voice chat on / off</button>
+        <div id="mppause-host">
+          <button data-action="mp-restart">Restart chamber (host)</button>
+          <button data-action="mp-tolobby">Return team to lobby (host)</button>
+        </div>
+        <button data-action="mp-remove-clone">Remove my clone</button>
+        <button data-action="settings">Settings</button>
+        <button data-action="mp-leave">Leave game</button>
+      </div>
+    </section>
+
+    <section id="screen-mpwin" class="screen hidden">
+      <div class="panel">
+        <h2 id="mpwin-title">Team victory</h2>
+        <p id="mpwin-stats" class="sub"></p>
+        <div id="mpwin-players" class="teamlist"></div>
+        <div id="mpwin-host">
+          <button data-action="mp-next" class="primary" id="btn-mpnext">Next chamber</button>
+          <button data-action="mp-restart">Replay</button>
+          <button data-action="mp-tolobby">Back to lobby</button>
+        </div>
+        <p class="note" id="mpwin-wait">Waiting for the host to choose what is next.</p>
+        <button data-action="mp-leave">Leave</button>
       </div>
     </section>
 

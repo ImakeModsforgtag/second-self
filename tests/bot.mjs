@@ -8,8 +8,8 @@ import { PLAYER } from '../src/config.js';
 export const DT = 1 / 60;
 
 export class Bot {
-  constructor(level, { verbose = false } = {}) {
-    this.g = new Game(level);
+  constructor(level, { verbose = false, players } = {}) {
+    this.g = new Game(level, players ? { players } : {});
     this.level = level;
     this.verbose = verbose;
     this.log = [];
@@ -17,6 +17,13 @@ export class Bot {
     this.holdDist = PLAYER.holdDistance;
     this.holdAim = null;
     this.carryY = null;
+  }
+
+  /** Multiplayer tests: act as player i from now on (others stand still). */
+  use(i) {
+    this.g.player = this.g.players.get(this.g.playerIds[i]);
+    this.holdAim = null; this.carryY = null; this.holdDist = PLAYER.holdDistance;
+    return this;
   }
 
   get p() { return this.g.player.body.pos; }

@@ -1,4 +1,6 @@
-# Render Blueprint for SECOND SELF (a static site: no server needed).
+# Render Blueprint for SECOND SELF.
+# second-self-coop: Node Web Service that serves the game AND runs co-op multiplayer (use this one).
+# second-self: the original static site (single player only, unless VITE_MP_SERVER points at the web service).
 services:
   - type: web
     runtime: static
@@ -15,3 +17,14 @@ services:
       - path: /*
         name: Permissions-Policy
         value: xr-spatial-tracking=(self)
+
+  - type: web
+    runtime: node
+    name: second-self-coop
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

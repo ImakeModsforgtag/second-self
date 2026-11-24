@@ -134,6 +134,64 @@ Keys can be rebound in **Settings**.
 
 ---
 
+## Co-op multiplayer (2 to 4 players, online)
+
+Main menu > **Co-op Multiplayer**. Type a username, then **Create Lobby** (you get a 6 character code) or type a friend's code and **Join Lobby**. Works across different computers and Quest headsets.
+
+* **Lobby:** players with their outfit colours, host badge, ready state, reconnecting state, voice icon. Everyone votes for a chamber; the host presses Start once everyone else is Ready.
+* **Outfit Customization:** shirt style (tee, long sleeve, tank, hoodie), shirt pattern, shirt and pattern colours, bottoms (shorts, trousers, cargo), shoes (sneakers, boots, high tops), hats (cap, beanie, bucket, visor, top hat), skin and hair. 8 presets, rotating 3D preview, saved in your browser.
+* **In game:** you still only see your own hands. Teammates (and their clones) are full characters wearing their outfits, with name tags.
+* **Chat:** T or Enter to type, 1 to 7 for quick chat (Follow me!, Wait!, I need help!, Stand here!, Move the mirror!, Press the button!, Let's go!), Tab for the team list, V to mute your mic. In VR, press Y for the Team Menu (quick chat, voice, host options).
+* **Voice chat (optional):** peer to peer WebRTC between players who switch it on.
+* **Disconnects:** the chamber pauses for up to 2 minutes while the player reconnects (refresh, Wi-Fi drop and headset sleep all reconnect automatically). The host can also continue without them, restart the chamber for the players still there, or send everyone back to the lobby.
+
+### The 8 co-op chambers
+
+Every chamber is rebuilt for the number of players when it starts (the server records the team size), and every size from 2 to 4 is tested to be solvable.
+
+| # | Chamber | Idea |
+|---|---------|------|
+| 1 | Teamwork | Plates hold a door open for one runner, who opens the way back for everyone. |
+| 2 | Double Vision | Crossed lanes: each player's door is opened by a teammate's plate. |
+| 3 | Weight Distribution | Hold the door, stack a crate, and with 3 or 4 players climb onto a teammate's head. |
+| 4 | Split Light | One sealed room per player, all lasers must reach their receivers at the same moment. |
+| 5 | The Clone Crew | Every player brings their clone into a booth, and one person holds the last plate. |
+| 6 | Four Directions | A hub with one wing per player (laser, crates, clone, mirror and lock). The north laser is powered from the east wing. |
+| 7 | No Player Left Behind | Big plate (everyone but one), human ladder, then a timed light puzzle. |
+| 8 | The Final Collaboration | Everything together, ending in a team lift out of the facility. |
+
+### How the networking works
+
+`server/index.js` is one Node process: it serves the built game and runs a WebSocket at `/ws`. Each lobby runs the real game simulation on the server (doors, plates, buttons, lasers, mirrors, crates, clones). Each client moves its own player for instant response, sends its position 20 times a second, and applies the server snapshots (20 per second) for everything shared, so there is only ever one copy of each object. Grabs are confirmed by the server, so two players can never hold the same crate.
+
+Run it on your PC:
+
+```
+npm install
+npm run build
+npm start
+```
+
+then open http://localhost:8080 in two browser windows (or on other devices on your Wi-Fi, use your PC's IP address, for example http://192.168.1.20:8080). For development with live reload run `npm start` in one window and `npm run dev` in another; the dev page connects to port 8080 automatically.
+
+### Deploy co-op on Render
+
+The static site cannot run a server, so co-op needs a **Web Service** (free plan works):
+
+1. Push this project to GitHub (same repo as before is fine).
+2. Render dashboard > **New** > **Web Service** > pick the repo.
+3. Runtime **Node**, Build Command `npm ci && npm run build`, Start Command `npm start`, Instance type **Free**. Leave everything else. Create.
+4. Open the `https://<name>.onrender.com` address it gives you. That one URL is the whole game, single player and co-op, and it works on Quest.
+
+Free Render services sleep after 15 minutes without visitors; the first visit then takes up to a minute while it wakes up (the game shows "Waking up the server").
+
+Optional: to keep using your existing static site URL for co-op too, add an environment variable `VITE_MP_SERVER` = `https://<web service name>.onrender.com` to the **static site** and redeploy it.
+
+### Tests
+
+* `npm test` runs the mechanics checks, all 20 single player chambers, and all 8 co-op chambers at 2, 3 and 4 players (24 runs) with bots that only use player actions.
+* `npm run test:net` starts the real server and connects real WebSocket clients: 5 lobbies play at the same time (2, 3 and 4 players), replaying the bot solutions through the server until it declares each chamber complete, plus wrong codes, full lobbies, ready checks, chat, quick chat, profile sync, disconnect pause, reconnect, host continue, restart, return to lobby and host hand over.
+
 ## How the mechanics work
 
 **The clone.** Clones appear at a pod. A clone reacts only while you are inside
@@ -216,8 +274,11 @@ src/render/             view (scene building), procedural textures, hands, clone
 src/input/              desktop (keyboard/mouse) and VR controllers
 src/ui/                 HTML menus and the in-headset VR panel
 src/audio/audio.js      synthesised sound effects and ambience
-tests/                  mechanics checks and full-game playthrough
-render.yaml             Render Blueprint (static site)
+src/mp/                 co-op chambers (levels.js), outfits, multiplayer session (menus, chat, net game loop)
+src/net/                shared protocol and snapshots, WebSocket client, WebRTC voice
+server/                 Node server: static files + WebSocket lobbies + authoritative co-op simulation
+tests/                  mechanics checks, single player and co-op playthroughs, real network test
+render.yaml             Render Blueprint (co-op web service + original static site)
 ```
 
 All sound effects are synthesised at runtime with the Web Audio API (original, no

@@ -292,3 +292,77 @@ export function cloudTexture() {
   cache.cloud = tex;
   return tex;
 }
+
+/** Shirt print for a multiplayer outfit: {shirt, shirt2, pattern}. Cached per combination. */
+export function outfitShirtTexture(o) {
+  const key = `shirt:${o.pattern}:${o.shirt}:${o.shirt2}`;
+  if (cache[key]) return cache[key];
+  if (o.pattern === 'wave' && o.shirt === '#1e3a8a' && o.shirt2 === '#3b82f6') { /* default look keeps its own colours below */ }
+  const w = 512, h = 256;
+  const c = canvas(w, h);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = o.shirt;
+  ctx.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 4) { ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fillRect(0, y, w, 2); }
+  ctx.fillStyle = o.shirt2; ctx.strokeStyle = o.shirt2;
+  switch (o.pattern) {
+    case 'stripes':
+      for (let y = 20; y < h; y += 36) ctx.fillRect(0, y, w, 14);
+      break;
+    case 'wave': {
+      const band = (y0, amp, color, width) => {
+        ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += 4) { const y = y0 + Math.sin((x / w) * Math.PI * 6) * amp; x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+        ctx.stroke();
+      };
+      band(118, 10, o.shirt2, 16); band(142, 10, '#f08a3c', 9); band(160, 10, '#e9edf2', 4);
+      break;
+    }
+    case 'dots':
+      for (let y = 18; y < h; y += 30) for (let x = (y / 30) % 2 ? 15 : 0; x < w; x += 30) { ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); }
+      break;
+    case 'check':
+      ctx.globalAlpha = 0.55;
+      for (let x = 0; x < w; x += 32) ctx.fillRect(x, 0, 14, h);
+      for (let y = 0; y < h; y += 32) ctx.fillRect(0, y, w, 14);
+      ctx.globalAlpha = 1;
+      break;
+    case 'split':
+      ctx.fillRect(0, h * 0.5, w, h * 0.5);
+      ctx.fillStyle = '#e9edf2'; ctx.fillRect(0, h * 0.5 - 4, w, 8);
+      break;
+    default: break;
+  }
+  // Small chest mark
+  ctx.save();
+  ctx.translate(w * 0.5 + 34, 70);
+  ctx.strokeStyle = '#e9edf2'; ctx.lineWidth = 4; ctx.strokeRect(-14, -14, 20, 20);
+  ctx.strokeStyle = o.shirt2; ctx.strokeRect(-4, -4, 20, 20);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(0, h - 14, w, 14); ctx.fillRect(0, 0, w, 10);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  cache[key] = tex;
+  return tex;
+}
+
+/** Floating name tag (not cached: one per player). */
+export function nameTagTexture(name, color = '#4fc3f7', extra = '') {
+  const w = 512, h = 128;
+  const c = canvas(w, h);
+  const ctx = c.getContext('2d');
+  ctx.font = '600 52px system-ui, sans-serif';
+  const tw = Math.min(w - 40, ctx.measureText(name).width + 70);
+  const x0 = (w - tw) / 2;
+  ctx.fillStyle = 'rgba(18,20,24,0.78)';
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0, 18, tw, 80, 40) : ctx.rect(x0, 18, tw, 80); ctx.fill();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x0 + 36, 58, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f2f4f7'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(name, x0 + 58, 60, tw - 70);
+  if (extra) { ctx.font = '28px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd27a'; ctx.fillText(extra, w / 2, 116); }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}

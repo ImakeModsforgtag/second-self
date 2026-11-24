@@ -8,10 +8,14 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
-    "test": "node tests/mechanics.mjs && node tests/playthrough.mjs"
+    "test": "node tests/mechanics.mjs && node tests/playthrough.mjs && node tests/mp-playthrough.mjs",
+    "test:net": "node tests/mp-net.mjs",
+    "start": "node server/index.js",
+    "dev:server": "node server/index.js"
   },
   "dependencies": {
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "ws": "^8.23.0"
   },
   "devDependencies": {
     "vite": "^5.4.11"

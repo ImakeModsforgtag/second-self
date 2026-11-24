@@ -51,21 +51,29 @@ export class Clone {
     return { x: this.body.pos.x, y: this.body.pos.y + CLONE.eye, z: this.body.pos.z };
   }
 
-  /** True if the player is inside the view cone and in clear line of sight. */
+  /**
+   * Can the clone see a player? It must be inside the view cone and in clear
+   * line of sight. With several players it follows the nearest one it can see.
+   */
   canSeePlayer() {
     const g = this.game;
     const eye = this.eyePos();
-    const head = g.playerHead();
-    const dx = head.x - eye.x, dz = head.z - eye.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist > CLONE.viewDistance) return { sees: false, dist, ang: 0 };
-    const ang = dist < 1e-4 ? 0 : wrapAngle(yawTo(eye.x, eye.z, head.x, head.z) - this.yaw);
-    if (Math.abs(ang) > CLONE.fov) return { sees: false, dist, ang };
-    const chest = { x: head.x, y: g.player.body.pos.y + 1.0, z: head.z };
-    const skip = (bx) => bx.body === this.body || bx.body === g.player.body ||
-      (g.held && bx.body === g.held.body);
-    const clear = g.world.segmentClear(eye, head, skip) || g.world.segmentClear(eye, chest, skip);
-    return { sees: clear, dist, ang };
+    let best = { sees: false, dist: Infinity, ang: 0 };
+    for (const pl of g.players.values()) {
+      if (pl.away) continue;
+      const head = g.playerHead(pl.id);
+      const dx = head.x - eye.x, dz = head.z - eye.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > CLONE.viewDistance || dist >= best.dist) continue;
+      const ang = dist < 1e-4 ? 0 : wrapAngle(yawTo(eye.x, eye.z, head.x, head.z) - this.yaw);
+      if (Math.abs(ang) > CLONE.fov) { if (!best.sees && dist < best.dist && g.players.size === 1) best = { sees: false, dist, ang }; continue; }
+      const chest = { x: head.x, y: pl.body.pos.y + 1.0, z: head.z };
+      const skip = (bx) => bx.body === this.body || bx.body === pl.body || (bx.body && bx.body.held);
+      const clear = g.world.segmentClear(eye, head, skip) || g.world.segmentClear(eye, chest, skip);
+      if (clear) best = { sees: true, dist, ang, target: pl.id };
+    }
+    this.target = best.target || null;
+    return best;
   }
 
   update(dt, solids) {

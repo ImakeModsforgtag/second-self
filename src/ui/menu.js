@@ -44,7 +44,7 @@ export class Menu {
   hideAll() { this.show(null); }
 
   back() {
-    const prev = this.stack.pop() || (this.app.state === 'paused' ? 'pause' : 'main');
+    const prev = this.stack.pop() || (this.app.state === 'paused' ? (this.app.mp && this.app.mp.inGame ? 'mppause' : 'pause') : 'main');
     const keep = [...this.stack];
     this.show(prev);
     this.stack = keep;
@@ -68,7 +68,7 @@ export class Menu {
         app.persist();
         this.renderSettings();
         break;
-      default: break;
+      default: if (app.mp) app.mp.action(a); break;
     }
   }
 

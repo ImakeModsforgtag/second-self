@@ -57,13 +57,16 @@ export class VRPanel {
     const b = [];
     const add = (label, action, x, y, w = 420, h = 70, enabled = true) => b.push({ label, action, x, y, w, h, enabled });
     const cx = W / 2 - 210;
-    if (this.page === 'main' || this.page === 'levels') {
+    if (this.page && this.page.startsWith('mp')) {
+      app.mp.vrLayout(this.page, add, W, H);
+    } else if (this.page === 'main' || this.page === 'levels') {
       LEVELS.forEach((lv, i) => {
         const col = i % 4, row = Math.floor(i / 4);
         add(`${lv.id}. ${lv.name}`, 'level:' + lv.id, 34 + col * 240, 152 + row * 72, 228, 62, lv.id <= app.save.unlocked);
       });
-      add(`Movement: ${app.save.settings.vrMovement === 'smooth' ? 'Smooth + teleport' : 'Teleport only'}`, 'toggle-move', 70, 528, 430, 60);
-      add('Exit VR', 'exit-vr', 520, 528, 430, 60);
+      add(`Movement: ${app.save.settings.vrMovement === 'smooth' ? 'Smooth' : 'Teleport'}`, 'toggle-move', 34, 528, 300, 60);
+      add('Co-op multiplayer', 'mp:open', 362, 528, 300, 60);
+      add('Exit VR', 'exit-vr', 690, 528, 300, 60);
     } else if (this.page === 'pause') {
       add('Resume', 'resume', cx, 150);
       add('Restart chamber', 'restart', cx, 235);
@@ -96,9 +99,11 @@ export class VRPanel {
       main: 'SECOND SELF', levels: 'SELECT A CHAMBER', pause: 'PAUSED',
       complete: `CHAMBER ${String(this.app.levelIndex).padStart(2, '0')} COMPLETE`, final: 'EXPERIMENT COMPLETE',
     };
-    c.fillText(titles[this.page] || '', W / 2, 90);
+    const isMp = this.page && this.page.startsWith('mp');
+    c.fillText(isMp ? this.app.mp.vrTitle(this.page) : titles[this.page] || '', W / 2, 90);
     c.font = '24px system-ui, sans-serif';
     c.fillStyle = '#9a9ea5';
+    if (isMp) c.fillText(this.app.mp.vrSubtitle(this.page), W / 2, 140, W - 60);
     if (this.page === 'main' || this.page === 'levels') c.fillText('Point and pull the trigger. Y opens this menu during play.', W / 2, 135);
     if (this.page === 'complete') c.fillText(this.app.lastStats || '', W / 2, 180);
     if (this.page === 'final') { c.fillText('Subject and copy have been released.', W / 2, 200); c.fillText(this.app.lastStats || '', W / 2, 245); }
@@ -132,6 +137,8 @@ export class VRPanel {
     if (!bt || !bt.enabled) return;
     this.app.audio.play('ui');
     const a = bt.action;
+    if (a === 'mp:open') { this.page = 'mp'; this.app.mp.net.connect(); this.draw(); return; }
+    if (a.startsWith('mp:')) { this.app.mp.vrAction(a.slice(3)); if (this.isOpen) this.draw(); return; }
     if (a.startsWith('level:')) { this.close(); this.app.startLevel(Number(a.slice(6))); return; }
     if (a === 'toggle-move') {
       const s = this.app.save.settings;

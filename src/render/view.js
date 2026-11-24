@@ -1,7 +1,7 @@
 // Builds and updates the 3D scene for one loaded level.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { concreteTiles, crateTexture, labelTexture, glowTexture, gripTexture, cloudTexture } from './textures.js';
+import { concreteTiles, crateTexture, labelTexture, glowTexture, gripTexture, cloudTexture, nameTagTexture } from './textures.js';
 import { CloneModel } from './cloneModel.js';
 import { LASER } from '../config.js';
 import { bodyBox } from '../sim/physics.js';
@@ -69,8 +69,14 @@ function iconLabel(letter, type, on) {
 iconLabel.cache = {};
 
 export class View {
-  constructor(game, scene, { settings }) {
+  /**
+   * roster (multiplayer): Map pid -> { name, outfit, color } used to dress
+   * teammates and their clones. Single player passes nothing.
+   */
+  constructor(game, scene, { settings, roster = null }) {
     this.game = game;
+    this.roster = roster;
+    this.playerModels = new Map();
     this.scene = scene;
     this.settings = settings;
     this.root = new THREE.Group();
@@ -311,7 +317,7 @@ export class View {
   _buildSky() {
     const g = this.game;
     if (!g.def.sky) return;
-    const [x0, z0, x1, z1] = g.def.bounds;
+    const [x0, z0, x1, z1] = g.data.bounds;
     const mat = this.track(new THREE.SpriteMaterial({ map: cloudTexture(), color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, fog: true }));
     const rand = (() => { let s = 1234 + g.def.id * 7; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; })();
     this.clouds = [];
@@ -653,15 +659,12 @@ export class View {
   // ------------------------------------------------------------------ events
   onEvent(e) {
     if (e.type === 'clone-spawn') {
-      const m = new CloneModel();
-      this.root.add(m.root);
-      this.cloneModels.push({ model: m, clone: this.game.clone });
+      // The model itself is created by _syncClones; this is just the effect.
       const pv = this.podViews.find((p) => p.p.x === e.x && p.p.z === e.z);
       if (pv) pv.pulse = 1.6;
       this.burst(e.x, e.y, e.z, 70, 0x7fb8ff, { spread: 0.5, up: 0.8, life: 1.3 });
     } else if (e.type === 'clone-remove') {
-      const cm = this.cloneModels.find((c) => c.clone && c.clone.removed && !c.model.leaving);
-      if (cm) { cm.model.leave(); this.burst(e.x, e.y, e.z, 40, 0x7fb8ff, { spread: 0.35, up: 1.4, life: 0.9 }); }
+      this.burst(e.x, e.y, e.z, 40, 0x7fb8ff, { spread: 0.35, up: 1.4, life: 0.9 });
     } else if (e.type === 'socket') {
       this.burst(e.x, 0.05, e.z, 16, 0x7fb8ff, { spread: 0.35, up: 0.6, life: 0.5, height: 0.1 });
     } else if (e.type === 'plate-on') {
@@ -791,7 +794,9 @@ export class View {
     for (let i = hi; i < this.hitPool.length; i++) this.hitPool[i].visible = false;
     this.beamGlowMat.opacity = 0.22 + Math.sin(t * 31) * 0.04;
 
-    // Clones
+    // Clones (one per player at most) and teammates
+    this._syncClones();
+    this._updatePlayers(dt);
     for (let i = this.cloneModels.length - 1; i >= 0; i--) {
       const cm = this.cloneModels[i];
       const c = cm.clone;
@@ -801,7 +806,8 @@ export class View {
         continue;
       }
       if (!c) continue;
-      const head = g.playerHead();
+      const tgt = c.target ? c.target.body.pos : null;
+      const head = tgt ? { x: tgt.x, y: tgt.y + 1.6, z: tgt.z } : g.playerHead();
       const ang = Math.atan2(-(head.x - c.pos.x), -(head.z - c.pos.z)) - c.yaw;
       let a = ang; while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2;
       cm.model.update(dt, {
@@ -852,8 +858,71 @@ export class View {
     return best;
   }
 
+  /** Make the clone models match the game's clones (works for 1 or 4 clones). */
+  _syncClones() {
+    const live = this.game.clones;
+    for (const cm of this.cloneModels) {
+      if (!cm.model.leaving && (!cm.clone || cm.clone.removed || !live.includes(cm.clone))) { cm.model.leave(); cm.clone = null; }
+    }
+    for (const c of live) {
+      if (this.cloneModels.some((cm) => cm.clone === c)) continue;
+      const info = this.roster && this.roster.get(c.owner);
+      const m = new CloneModel(info ? info.outfit : null, { ringColor: info ? info.color : null });
+      this.root.add(m.root);
+      this.cloneModels.push({ model: m, clone: c });
+    }
+  }
+
+  /** Teammates: full characters with name tags, smoothed between snapshots. */
+  _updatePlayers(dt) {
+    const g = this.game;
+    if (!this.roster) return;
+    for (const pl of g.players.values()) {
+      if (pl === g.player) continue;
+      let pm = this.playerModels.get(pl.id);
+      const info = this.roster.get(pl.id) || { name: pl.id, outfit: null, color: '#4fc3f7' };
+      if (!pm) {
+        const model = new CloneModel(info.outfit, { mode: 'player', ringColor: info.color });
+        const mat = new THREE.SpriteMaterial({ map: nameTagTexture(info.name, info.color), depthTest: false, transparent: true });
+        const tag = new THREE.Sprite(mat);
+        tag.scale.set(0.9, 0.225, 1);
+        tag.renderOrder = 990;
+        model.root.add(tag);
+        tag.position.y = 2.08;
+        this.root.add(model.root);
+        const b = pl.body.pos;
+        pm = { model, tag, mat, name: info.name, outfitKey: JSON.stringify(info.outfit), x: b.x, y: b.y, z: b.z, yaw: pl.yaw, speed: 0 };
+        this.playerModels.set(pl.id, pm);
+      }
+      // Profile changes while playing
+      const ok = JSON.stringify(info.outfit);
+      if (ok !== pm.outfitKey && info.outfit) { pm.model.applyOutfit(info.outfit); pm.outfitKey = ok; }
+      if (info.name !== pm.name) { pm.mat.map.dispose(); pm.mat.map = nameTagTexture(info.name, info.color); pm.mat.needsUpdate = true; pm.name = info.name; }
+      const b = pl.body.pos;
+      const k = Math.min(1, dt * 14);
+      const ox = pm.x, oz = pm.z;
+      pm.x += (b.x - pm.x) * k; pm.y += (b.y - pm.y) * k; pm.z += (b.z - pm.z) * k;
+      if (Math.hypot(b.x - pm.x, b.z - pm.z) > 4) { pm.x = b.x; pm.y = b.y; pm.z = b.z; }
+      let dy = pl.yaw - pm.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
+      pm.yaw += dy * k;
+      const sp = dt > 0 ? Math.hypot(pm.x - ox, pm.z - oz) / dt : 0;
+      pm.speed += (sp - pm.speed) * Math.min(1, dt * 6);
+      pm.model.root.visible = !pl.away;
+      pm.model.updatePlayer(dt, {
+        x: pm.x, y: pm.y, z: pm.z, yaw: pm.yaw, pitch: pl.pitch, speed: pm.speed,
+        air: !pl.body.grounded, hold: !!pl.netHold, away: pl.away,
+      });
+    }
+    for (const [pid, pm] of this.playerModels) {
+      if (g.players.has(pid)) continue;
+      this.root.remove(pm.model.root); pm.model.dispose(); pm.mat.map.dispose(); pm.mat.dispose();
+      this.playerModels.delete(pid);
+    }
+  }
+
   dispose() {
     for (const cm of this.cloneModels) cm.model.dispose();
+    for (const pm of this.playerModels.values()) { pm.model.dispose(); pm.mat.map.dispose(); pm.mat.dispose(); }
     this.scene.remove(this.root);
     for (const o of this.disposables) if (o.dispose) o.dispose();
     this.disposables = [];

@@ -14,6 +14,7 @@ import { DesktopInput } from './input/desktop.js';
 import { loadSave, writeSave, PLAYER } from './config.js';
 import { GunModel } from './render/gun.js';
 import { skyTexture } from './render/textures.js';
+import { Multiplayer } from './mp/session.js';
 
 const EVENT_SOUNDS = {
   'clone-step': 'clone-step', jump: 'jump', pickup: 'pickup', drop: 'drop', thud: 'thud',
@@ -99,6 +100,7 @@ class App {
     // ---------------- Systems
     this.audio = new Audio();
     this.menu = new Menu(this);
+    this.mp = new Multiplayer(this);
     this.vrPanel = new VRPanel(this);
     this.scene.add(this.vrPanel.mesh);
     this.scene.add(this.vrPanel.hint);
@@ -318,12 +320,52 @@ class App {
     }
   }
 
+  /** Co-op: build the chamber the server started, for this team size. */
+  startNetLevel(def, playerIds, localId, roster, count, pos) {
+    this.audio.init();
+    this._disposeLevel();
+    this.backdrop = false;
+    this.game = new Game(def, { players: playerIds, localId, netClient: true });
+    this.mp.installWrappers(this.game);
+    if (pos) {
+      const b = this.game.player.body.pos;
+      b.x = pos[0]; b.y = pos[1]; b.z = pos[2];
+      this.game.player.yaw = pos[3];
+    }
+    this.view = new View(this.game, this.scene, { settings: this.save.settings, roster });
+    this._applyEnv();
+    this.state = 'playing';
+    this.holdDist = PLAYER.holdDistance;
+    this.levelStart = performance.now();
+    this.menu.clearHUD();
+    this.menu.hideAll();
+    this.menu.setLevelTag(`Co-op ${def.id}  ${def.name}  (${count} players)`);
+    this.menu.fade(true);
+    setTimeout(() => this.menu.fade(false), 60);
+    if (this.inXR) {
+      this.vrPanel.close();
+      this._placeRigAt(this.game.player.body.pos, this.game.player.yaw);
+    } else {
+      this.rig.position.set(0, 0, 0); this.rig.rotation.set(0, 0, 0);
+      this.input.lock();
+    }
+  }
+
+  /** Back to the menu backdrop without leaving the lobby. */
+  toBackdrop() {
+    this.state = 'menu';
+    this.input.unlock();
+    this._loadMenuBackdrop();
+  }
+
   pause() {
     if (this.state !== 'playing') return;
     this.state = 'paused';
     this.input.keys.clear();
-    if (this.inXR) this.vrPanel.open('pause', this.camera);
-    else { this.input.unlock(); this.menu.show('pause'); }
+    const page = this.mp.inGame ? 'mppause' : 'pause';
+    if (this.mp.inGame) this.mp._renderPlayerList();
+    if (this.inXR) this.vrPanel.open(page, this.camera);
+    else { this.input.unlock(); this.menu.show(page); }
   }
 
   resume() {
@@ -444,7 +486,7 @@ class App {
       this._updateLamps();
     } else if (g) {
       if (!this.inXR) {
-        const show = this.state === 'playing' || !!g.finalSeq;
+        const show = this.state === 'playing' || this.state === 'chat' || !!g.finalSeq;
         this.handR.root.visible = show; this.handL.root.visible = show;
       }
       const playing = this.state === 'playing';
@@ -463,7 +505,23 @@ class App {
         input = { move: { x: mx, z: mz }, jump: it.jump };
       }
 
-      if (playing || this.state === 'complete' || this.state === 'final') {
+      const netGame = this.mp.inGame && g.netClient;
+      if (netGame) {
+        if (!this.inXR && g.held) {
+          const { e, d } = this._viewRay();
+          const t = g.holdTargetFromView(e, d, this.holdDist);
+          g.setHoldTarget(t.x, t.y, t.z);
+        }
+        const prev = { x: g.player.body.pos.x, y: g.player.body.pos.y, z: g.player.body.pos.z };
+        const events = this.mp.step(dt, playing ? input : { move: { x: 0, z: 0 }, jump: false });
+        if (this.inXR) {
+          const pb = g.player.body.pos;
+          this.rig.position.x += pb.x - prev.x;
+          this.rig.position.z += pb.z - prev.z;
+          this.rig.position.y = pb.y;
+        }
+        this._handleEvents(events);
+      } else if (playing || this.state === 'complete' || this.state === 'final') {
         // Held object target from the view (desktop) or hand (VR, set in vr.update)
         if (!this.inXR && g.held) {
           const { e, d } = this._viewRay();

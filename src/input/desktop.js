@@ -52,6 +52,8 @@ export class DesktopInput {
         else if (e.code === b.resetClone) this.app.doResetClone();
         else if (e.code === b.fire) this.app.fireGun();
         else if (e.code === b.pause || e.code === 'Escape') this.app.pause();
+      } else if (e.code === 'Escape' && this.app.state === 'paused' && this.app.menu.current === 'mppause') {
+        this.app.resume();
       } else if (e.code === 'Escape' && this.app.state === 'paused' && this.app.menu.current !== 'pause') {
         this.app.menu.back();
       }

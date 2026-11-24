@@ -8,12 +8,12 @@ const NORMALS = {
   N: { x: 0, z: -1 }, S: { x: 0, z: 1 }, E: { x: 1, z: 0 }, W: { x: -1, z: 0 },
 };
 
-export function buildLevel(def) {
+export function buildLevel(def, playerCount = 1) {
   const H = def.height || 5;
   const data = {
     statics: [], pods: [], plates: [], buttons: [], emitters: [], receivers: [],
     mirrors: [], sockets: [], blocks: [], doors: [], exits: [], hints: [], lights: [],
-    wires: [], decals: [], checkpoints: [], start: def.start, height: H, bounds: def.bounds,
+    wires: [], decals: [], checkpoints: [], start: def.start, starts: null, height: H, bounds: null,
   };
 
   const S = (x0, y0, z0, x1, y1, z1, mat = 'wall', extra = {}) => {
@@ -43,15 +43,21 @@ export function buildLevel(def) {
     barrier(x0, z0, x1, z1, h = 1.0, y0 = 0) { S(x0, y0, z0, x1, y0 + h, z1, 'barrier'); },
     pillar(x0, z0, x1, z1, y0 = 0, y1 = H) { S(x0, y0, z0, x1, y1, z1, 'wall'); },
 
-    door({ id, x, z, axis, width = 2, height = 2.7, y0 = 0, requires = [], latch = false, exit = false }) {
-      data.doors.push({ id, x, z, axis, width, height, y0, requires, latch, exit });
+    door({ id, x, z, axis, width = 2, height = 2.7, y0 = 0, requires = [], latch = false, exit = false, any = false }) {
+      data.doors.push({ id, x, z, axis, width, height, y0, requires, latch, exit, any });
       // Header above the door opening (a short lintel in the open sky).
       const top = def.sky ? y0 + height + 0.5 : H;
       if (axis === 'x') S(x - width / 2, y0 + height, z - T / 2, x + width / 2, top, z + T / 2, 'wall');
       else S(x - T / 2, y0 + height, z - width / 2, x + T / 2, top, z + width / 2, 'wall');
     },
-    plate({ id, x, z, w = 1.6, d = 1.6, y = 0 }) {
-      data.plates.push({ id, x0: x - w / 2, z0: z - d / 2, x1: x + w / 2, z1: z + d / 2, y, x, z });
+    /** need: how many bodies (players, clones, crates) must stand on it at once. */
+    plate({ id, x, z, w = 1.6, d = 1.6, y = 0, need = 1 }) {
+      data.plates.push({ id, x0: x - w / 2, z0: z - d / 2, x1: x + w / 2, z1: z + d / 2, y, x, z, need });
+    },
+    /** Multiplayer start position for player index i. */
+    spawn(i, x, z, yaw = 0, y = 0) {
+      data.starts = data.starts || [];
+      data.starts[i] = { x, z, y, yaw: (yaw * Math.PI) / 180 };
     },
     button({ id, x, y, z, facing, mode = 'toggle', duration }) {
       data.buttons.push({ id, x, y, z, normal: NORMALS[facing], facing, mode, duration });
@@ -89,7 +95,9 @@ export function buildLevel(def) {
   };
 
   // Floor and ceiling over the whole footprint (sky chambers have neither).
-  const [bx0, bz0, bx1, bz1] = def.bounds;
+  const bounds = typeof def.bounds === 'function' ? def.bounds(playerCount) : def.bounds;
+  data.bounds = bounds;
+  const [bx0, bz0, bx1, bz1] = bounds;
   if (!def.sky) S(bx0, -0.5, bz0, bx1, 0, bz1, 'floor');
   if (def.sky) { /* open air */ } else if (def.ceilingHoles) {
     // Simple split: ceiling around one rectangular hole.
@@ -102,7 +110,7 @@ export function buildLevel(def) {
     S(bx0, H, bz0, bx1, H + 0.4, bz1, 'ceiling');
   }
 
-  def.build(api);
+  def.build(api, playerCount);
   return data;
 }
 

@@ -3,7 +3,7 @@
 // mouth. Faces -z. Feet at y = 0, height about 1.75 m.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { shirtTexture } from './textures.js';
+import { shirtTexture, outfitShirtTexture } from './textures.js';
 
 function capsule(r, len, mat) {
   const g = new THREE.CapsuleGeometry(r, Math.max(0.001, len - 2 * r), 4, 10);
@@ -14,7 +14,12 @@ function capsule(r, len, mat) {
 }
 
 export class CloneModel {
-  constructor() {
+  /**
+   * outfit: multiplayer outfit (see net/protocol.js) or null for the classic look.
+   * mode: 'clone' (glows in and follows the clone rules) or 'player' (a teammate).
+   */
+  constructor(outfit = null, { mode = 'clone', ringColor = null } = {}) {
+    this.mode = mode;
     this.root = new THREE.Group();
     this.root.name = 'clone';
     this.body = new THREE.Group();
@@ -88,10 +93,12 @@ export class CloneModel {
     hair.position.set(0, 0.075, 0.008);
     hair.rotation.x = 0.18;
     head.add(hair);
+    this.hairMesh = hair;
     const fringe = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.035, 0.05, 2, 0.015), mats.hair);
     fringe.position.set(0.01, 0.15, -0.083);
     fringe.rotation.set(-0.3, 0, -0.12);
     head.add(fringe);
+    this.fringe = fringe;
     for (const s of [-1, 1]) {
       const ear = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), mats.skin);
       ear.scale.set(0.5, 1, 0.8);
@@ -146,13 +153,14 @@ export class CloneModel {
       const elbow = new THREE.Group();
       elbow.position.y = -0.28;
       shoulder.add(elbow);
-      elbow.add(capsule(0.037, 0.25, mats.skin));
+      const lower = capsule(0.037, 0.25, mats.skin);
+      elbow.add(lower);
       const hand = new THREE.Mesh(new RoundedBoxGeometry(0.06, 0.09, 0.03, 2, 0.013), mats.skin);
       hand.position.y = -0.29;
       hand.castShadow = true;
       elbow.add(hand);
       shoulder.rotation.z = 0.08 * s;
-      this.arms.push({ shoulder, elbow, s });
+      this.arms.push({ shoulder, elbow, s, sleeve, upper, lower });
     }
 
     // ---------------- Legs
@@ -165,11 +173,13 @@ export class CloneModel {
       short.position.y = -0.12;
       short.castShadow = true;
       hip.add(short);
-      hip.add(capsule(0.06, 0.42, mats.skin));
+      const thigh = capsule(0.06, 0.42, mats.skin);
+      hip.add(thigh);
       const knee = new THREE.Group();
       knee.position.y = -0.4;
       hip.add(knee);
-      knee.add(capsule(0.05, 0.38, mats.skin));
+      const shin = capsule(0.05, 0.38, mats.skin);
+      knee.add(shin);
       const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.043, 0.08, 10), mats.sock);
       sock.position.y = -0.36;
       knee.add(sock);
@@ -187,8 +197,61 @@ export class CloneModel {
       stripe.position.set(0, -0.012, -0.03);
       stripe.rotation.x = 0.25;
       foot.add(stripe);
-      this.legs.push({ hip, knee, foot, s });
+      // Boot and high-top collars (shown by the outfit)
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.062, 0.14, 12), mats.shoe);
+      collar.position.y = -0.33;
+      collar.visible = false;
+      knee.add(collar);
+      const pocket = new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.08, 0.1, 1, 0.01), mats.shorts);
+      pocket.position.set(0.08 * s, -0.16, 0);
+      pocket.visible = false;
+      hip.add(pocket);
+      this.legs.push({ hip, knee, foot, s, short, thigh, shin, sock, shoe, collar, pocket });
     }
+
+    // ---------------- Hats and hood (outfit options)
+    mats.hat = M(0xc62828, 0.75);
+    mats.hatBand = M(0x222222, 0.7);
+    this.allMats.push(mats.hat, mats.hatBand);
+    const hats = {};
+    const hatRoot = new THREE.Group();
+    hatRoot.position.y = 0.075;
+    head.add(hatRoot);
+    // Cap: dome + brim
+    hats.cap = new THREE.Group();
+    { const dome = new THREE.Mesh(new THREE.SphereGeometry(0.118, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), mats.hat); dome.scale.set(1, 0.75, 1.05); hats.cap.add(dome);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.012, 16, 1, false, -Math.PI / 2, Math.PI), mats.hat); brim.scale.set(1, 1, 1.25); brim.position.set(0, 0.005, -0.1); hats.cap.add(brim); }
+    // Beanie
+    hats.beanie = new THREE.Group();
+    { const b = new THREE.Mesh(new THREE.SphereGeometry(0.122, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), mats.hat); b.scale.set(1, 1.1, 1.05); hats.beanie.add(b);
+      const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.112, 0.022, 8, 24), mats.hat); cuff.rotation.x = Math.PI / 2; cuff.position.y = 0.0; hats.beanie.add(cuff);
+      const pom = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), mats.hatBand); pom.position.y = 0.14; hats.beanie.add(pom); }
+    // Bucket hat
+    hats.bucket = new THREE.Group();
+    { const top = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.09, 18), mats.hat); top.position.y = 0.05; hats.bucket.add(top);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.012, 24), mats.hat); brim.position.y = 0.005; hats.bucket.add(brim); }
+    // Visor
+    hats.visor = new THREE.Group();
+    { const band = new THREE.Mesh(new THREE.TorusGeometry(0.112, 0.014, 6, 24), mats.hatBand); band.rotation.x = Math.PI / 2; hats.visor.add(band);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.012, 16, 1, false, -Math.PI / 2, Math.PI), mats.hat); brim.scale.set(1, 1, 1.3); brim.position.set(0, 0, -0.1); hats.visor.add(brim); }
+    // Top hat
+    hats.tophat = new THREE.Group();
+    { const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.2, 20), mats.hat); crown.position.y = 0.11; hats.tophat.add(crown);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.097, 0.097, 0.03, 20), mats.hatBand); band.position.y = 0.03; hats.tophat.add(band);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.012, 24), mats.hat); hats.tophat.add(brim); }
+    for (const h of Object.values(hats)) { h.visible = false; h.traverse((o) => { if (o.isMesh) o.castShadow = true; }); hatRoot.add(h); }
+    this.hats = hats;
+    // Hoodie hood (behind the head)
+    mats.hood = M(0x1f2a44, 0.85);
+    this.allMats.push(mats.hood);
+    // Hood down: a thick roll lying around the back of the neck.
+    this.hood = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.05, 10, 20, Math.PI * 1.25), mats.hood);
+    this.hood.rotation.set(Math.PI / 2 - 0.35, 0, -Math.PI * 0.125);
+    this.hood.position.set(0, 0.55, 0.02);
+    this.hood.scale.set(1.05, 1, 1);
+    this.hood.castShadow = true;
+    this.hood.visible = false;
+    chest.add(this.hood);
 
     // Ground ring: blue while it can see you, pale while frozen.
     this.ringMat = new THREE.MeshBasicMaterial({ color: 0x5aa2ff, transparent: true, opacity: 0.5, depthWrite: false });
@@ -209,7 +272,83 @@ export class CloneModel {
     this.appear = 0;   // 0..1
     this.leaving = false;
     this.done = false;
-    this.setGlow(1);
+    this.ringColor = ringColor ? new THREE.Color(ringColor) : null;
+    if (outfit) this.applyOutfit(outfit);
+    if (mode === 'player') {
+      this.appear = 1.5;
+      this.setGlow(0);
+      this.scanMat.opacity = 0;
+      this.ringMat.color.copy(this.ringColor || new THREE.Color(0x4fc3f7));
+      this.ringMat.opacity = 0.55;
+    } else this.setGlow(1);
+  }
+
+  /** Dress the model: shirt style, print, colours, shorts, shoes, hat, skin and hair. */
+  applyOutfit(o) {
+    const m = this.mats;
+    const col = (hex) => new THREE.Color(hex);
+    m.shirt.map = outfitShirtTexture(o); m.shirt.color.set(0xffffff); m.shirt.needsUpdate = true;
+    m.sleeve.color = col(o.shirt);
+    m.hood.color = col(o.shirt);
+    m.shorts.color = col(o.shorts);
+    m.shoe.color = col(o.shoes);
+    m.stripe.color = col(o.shirt2);
+    m.hat.color = col(o.hatColor);
+    m.skin.color = col(o.skin);
+    m.hair.color = col(o.hair);
+    m.brow.color = col(o.hair).multiplyScalar(0.8);
+    const long = o.shirtStyle === 'longsleeve' || o.shirtStyle === 'hoodie';
+    for (const a of this.arms) {
+      a.sleeve.visible = o.shirtStyle !== 'tank';
+      a.upper.material = long ? m.sleeve : m.skin;
+      a.lower.material = long ? m.sleeve : m.skin;
+    }
+    this.hood.visible = o.shirtStyle === 'hoodie';
+    for (const l of this.legs) {
+      const pants = o.shortsStyle === 'long';
+      l.short.scale.y = o.shortsStyle === 'cargo' ? 1.25 : 1;
+      l.shin.material = pants ? m.shorts : m.skin;
+      l.thigh.material = pants || o.shortsStyle === 'cargo' ? m.shorts : m.skin;
+      l.pocket.visible = o.shortsStyle === 'cargo';
+      l.collar.visible = o.shoeStyle === 'boots' || o.shoeStyle === 'hightops';
+      l.collar.scale.y = o.shoeStyle === 'boots' ? 1.6 : 1;
+      l.collar.position.y = o.shoeStyle === 'boots' ? -0.31 : -0.34;
+      l.sock.visible = !l.collar.visible && !pants;
+    }
+    for (const [k, h] of Object.entries(this.hats)) h.visible = k === o.hat;
+    const hatOn = o.hat !== 'none';
+    this.hairMesh.visible = o.hat !== 'beanie' && o.hat !== 'tophat' && o.hat !== 'bucket';
+    this.fringe.visible = !hatOn || o.hat === 'visor';
+  }
+
+  /** Teammate animation: position, yaw, head pitch, speed, airborne and carrying. */
+  updatePlayer(dt, s) {
+    this.root.position.set(s.x, s.y, s.z);
+    this.root.rotation.y = s.yaw;
+    this.breath += dt;
+    const walking = s.speed > 0.3 && !s.air;
+    this.walkBlend = (this.walkBlend || 0) + ((walking ? 1 : 0) - (this.walkBlend || 0)) * Math.min(1, dt * 8);
+    this.airBlend = (this.airBlend || 0) + ((s.air ? 1 : 0) - (this.airBlend || 0)) * Math.min(1, dt * 10);
+    this.phase += dt * Math.min(9, s.speed * 2.6);
+    const wb = this.walkBlend, ab = this.airBlend, ph = this.phase;
+    const sw = Math.sin(ph) * 0.55 * wb;
+    for (const leg of this.legs) {
+      leg.hip.rotation.x = sw * leg.s - ab * 0.5;
+      leg.knee.rotation.x = Math.max(0, Math.sin(ph + (leg.s > 0 ? 0 : Math.PI) + 0.6)) * 0.8 * wb + ab * 0.9;
+      leg.foot.rotation.x = -leg.hip.rotation.x * 0.3;
+    }
+    for (const arm of this.arms) {
+      const target = s.hold ? -1.25 : -sw * arm.s * 0.8 - ab * 0.6;
+      arm.shoulder.rotation.x += (target - arm.shoulder.rotation.x) * Math.min(1, dt * 10);
+      arm.elbow.rotation.x = s.hold ? -0.35 : -0.25 - Math.abs(sw) * 0.3;
+      arm.shoulder.rotation.z = (s.hold ? 0.18 : 0.08) * -arm.s;
+    }
+    this.body.position.y = Math.abs(Math.cos(ph)) * 0.025 * wb + Math.sin(this.breath * 1.7) * 0.003;
+    this.chest.rotation.y = sw * 0.12;
+    this.chest.rotation.x = Math.sin(this.breath * 1.7) * 0.01;
+    this.head.rotation.x = Math.max(-0.6, Math.min(0.6, -(s.pitch || 0) * 0.7));
+    this.head.rotation.y = 0;
+    this.ringMat.opacity = s.away ? 0.1 : 0.55;
   }
 
   setGlow(v) {
@@ -282,7 +421,8 @@ export class CloneModel {
 
     // Ground ring
     const seen = s.sees ? 1 : 0;
-    this.ringMat.color.setRGB(0.35 + 0.6 * (1 - seen), 0.62 + 0.36 * (1 - seen), 1);
+    if (this.ringColor) this.ringMat.color.copy(this.ringColor).lerp(new THREE.Color(1, 1, 1), (1 - seen) * 0.6);
+    else this.ringMat.color.setRGB(0.35 + 0.6 * (1 - seen), 0.62 + 0.36 * (1 - seen), 1);
     this.ringMat.opacity = s.sees ? 0.75 : 0.28;
   }
 
